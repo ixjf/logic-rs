@@ -105,9 +105,9 @@ compound-predicate                  =
                                     ; (α ⊃ β)
                                     / (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalConditionalToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
 
-existential-quantifier-statement    = ExistentialQuantifierToken predicate
+existential-quantifier-statement    = ExistentialQuantifierToken WSP-ANY predicate
 
-universal-quantifier-statement      = UniversalQuantifierToken predicate
+universal-quantifier-statement      = UniversalQuantifierToken WSP-ANY predicate
 
 complex-statement                   =/ existential-quantifier-statement 
                                     / universal-quantifier-statement
