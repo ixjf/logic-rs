@@ -1,126 +1,167 @@
-;;;
-;;;
-;;; RULES REUSED HERE
-;;;
-;;;
-UALPHA                 = %x41-5A ; A-Z
+; Follows ABNF syntax as defined here: http://www.rfc-editor.org/rfc/rfc5234.txt
+; Core Rules are used here
 
- ; SUBSCRIPT-NUMBER defines any positive integer, leading zeros not allowed, in subscript
-SUBSCRIPT-NUMBER       = (%x2081-2089 [ SUBSCRIPT-NUMBER ]) 
-                       / (SUBSCRIPT-NUMBER %x2080 [ SUBSCRIPT-NUMBER ])
+; Any rule whose name is in upper camel case is a token definition
+;
+; Any rule whose name is in capitals (w/ or wo/ dashes) is an extension to the core rules
+;
+; Any rule whose name is in dash-case (e.g. dash-case) is an expression definition
 
-WHITESPACE             = *WSP ; 'WSP' from Core Rules defined in the reference RFC5234
+UALPHA                              = %x41-5A ; A-Z
 
-WHITESPACE-RETURN      = WHITESPACE / *CRLF ; 'CRLF' from Core Rules defined in the reference RFC5234
+WSP-ANY                             = *WSP
+
+WSP-CRLF-ANY                        = WSP-ANY / *CRLF
 
 ;;;
 ;;;
 ;;; RULES OF PROPOSITIONAL LOGIC
 ;;;
 ;;;
-simple-statement       = (UALPHA [ SUBSCRIPT-NUMBER ]) 
-                       / ("(" WHITESPACE UALPHA [ SUBSCRIPT-NUMBER ] WHITESPACE ")")
+;;;; Tokens
+;;;
+GrouperOpeningToken                 = "("
 
-logical-conjunction    = "(" WHITESPACE statement WHITESPACE "&" WHITESPACE statement WHITESPACE ")"
+GrouperClosingToken                 = ")"
 
-logical-negation       = ("~" WHITESPACE statement) 
-                       / ("(" WHITESPACE "~" WHITESPACE statement WHITESPACE ")") ; groupers aren't needed as it's unambiguous
+LogicalConjunctionToken             = "&"
 
-logical-disjunction    = "(" WHITESPACE statement WHITESPACE %x2228 WHITESPACE statement WHITESPACE ")" ; where %x2228 = ∨
+LogicalNegationToken                = "~"
 
-logical-conditional    = "(" WHITESPACE statement WHITESPACE %x2283 WHITESPACE statement WHITESPACE ")" ; where %x2283 = ⊃
+LogicalDisjunctionToken             = %x2228 ; where %x2228 = ∨
 
-complex-statement      = logical-conjunction
-                       / logical-negation
-                       / logical-disjunction 
-                       / logical-conditional
+LogicalConditionalToken             = %x2283 ; where %x2283 = ⊃
 
-statement              = simple-statement / complex-statement
+StatementSeparatorToken             = ","
+
+ConclusionIndicatorToken            = ".:."
+
+SetOpeningToken                     = "{"
+
+SetClosingToken                     = "}"
+
+SimpleStatementToken                = UALPHA [ SubscriptNumberToken ]
+
+; defines, in subscript, any positive integer (leading zeros not allowed)
+SubscriptNumberToken                = (%x2081-2089 [ SubscriptNumberToken ])
+                                    / (SubscriptNumberToken %x2080 [ SubscriptNumberToken ])
 
 ;;;
+;;;; Expressions
 ;;;
-;;; MAIN PARSING RULES
-;;;
-;;;
-statement-list         = statement 
-                       / (statement WHITESPACE "," WHITESPACE-RETURN statement-list)
+simple-statement                    = SimpleStatementToken
+                                    / (GrouperOpeningToken WSP-ANY SimpleStatementToken WSP-ANY GrouperClosingToken)
 
-argument-conclusion    = ".:." WHITESPACE statement
+logical-conjunction                 = (statement WSP-ANY LogicalConjunctionToken WSP-ANY statement) ; syntatically allowed but more than likely ambiguous
+                                    / (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalConjunctionToken WSP-ANY statement WSP-ANY GrouperClosingToken)
 
-argument-premise-list  = statement-list
+logical-negation                    = (LogicalNegationToken WSP-ANY statement) 
+                                    / (GrouperOpeningToken WSP-ANY LogicalNegationToken WSP-ANY statement WSP-ANY GrouperClosingToken) ; groupers aren't needed as it's unambiguous
 
-argument               = argument-premise-list WHITESPACE-RETURN argument-conclusion
+logical-disjunction                 = (statement WSP-ANY LogicalDisjunctionToken WSP-ANY statement) ; syntatically allowed but more than likely ambiguous
+                                    / (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalDisjunctionToken WSP-ANY statement WSP-ANY GrouperClosingToken)
 
-statement-set          = "{" WHITESPACE-RETURN statement-list WHITESPACE-RETURN "}"
+logical-conditional                 = (statement WSP-ANY LogicalConditionalToken WSP-ANY statement) ; syntatically allowed but more than likely ambiguous
+                                    / (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalConditionalToken WSP-ANY statement WSP-ANY GrouperClosingToken)
 
-input                  = argument / statement-set
+complex-statement                   = logical-conjunction
+                                    / logical-negation
+                                    / logical-disjunction 
+                                    / logical-conditional
+
+statement                           = simple-statement / complex-statement
+
+statement-list                      = statement 
+                                    / (statement WSP-ANY StatementSeparatorToken WSP-CRLF-ANY statement-list)
+
+argument-conclusion                 = ConclusionIndicatorToken WSP-ANY statement
+
+argument-premise-list               = statement-list
+
+argument                            = argument-premise-list WSP-CRLF-ANY argument-conclusion
+
+statement-set                       = SetOpeningToken WSP-CRLF-ANY statement-list WSP-CRLF-ANY SetClosingToken
+
+;;; rpl-rs specific rule
+input                               = argument / statement-set
 
 ;;;
 ;;;
 ;;; RULES OF PROPERTY PREDICATE LOGIC
 ;;;
 ;;;
-singular-term                    = %x61-77 [ SUBSCRIPT-NUMBER ] ; a-w [ SUBSCRIPT-NUMBER ]
+;;;; Tokens
+;;;
+SingularTermToken                   = %x61-77 [ SubscriptNumberToken ] ; a-w [ SubscriptNumberToken ]
 
-property-predicate               = UALPHA [ SUBSCRIPT-NUMBER ] %x00B9 ; where %x00B9 = ¹  (superscript numeral '1')
+ExistentialQuantifierToken          = %x2203 ; where %x2203 = ∃
 
-singular-statement               = (property-predicate singular-term) 
-                                 / ("(" WHITESPACE property-predicate singular-term WHITESPACE ")")
+UniversalQuantifierToken            = %x2200 ; where %x2200 = ∀
 
-simple-statement                 =/ singular-statement
+;;;
+;;;; Expressions
+;;;
+property-predicate                  = UALPHA [ SubscriptNumberToken ] %x00B9 ; where %x00B9 = ¹  (superscript numeral '1')
 
-predicate                        = simple-predicate / compound-predicate
+singular-statement                  = (property-predicate SingularTermToken) 
+                                    / (GrouperOpeningToken WSP-ANY property-predicate SingularTermToken WSP-ANY GrouperClosingToken)
 
-simple-predicate                 = property-predicate
+simple-statement                    =/ singular-statement
 
-compound-predicate               = ("(" WHITESPACE predicate WHITESPACE "&" WHITESPACE predicate WHITESPACE ")") 
-                                 / ("~" WHITESPACE predicate) 
-                                 / ("(" WHITESPACE predicate WHITESPACE %x2228 WHITESPACE predicate WHITESPACE ")")  ; where %x2228 = ∨
-                                 / ("(" WHITESPACE predicate WHITESPACE %x2283 WHITESPACE predicate WHITESPACE ")")  ; where %x2283 = ⊃
+predicate                           = simple-predicate / compound-predicate
 
-existential-quantifier           = %x2203 ; where %x2203 = ∃
+simple-predicate                    = property-predicate
 
-universal-quantifier             = %x2200 ; where %x2200 = ∀
+compound-predicate                  = 
+                                    ; (α & β)
+                                      (predicate WSP-ANY LogicalConjunctionToken WSP-ANY predicate)
+                                    / (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalConjunctionToken WSP-ANY predicate WSP-ANY GrouperClosingToken) 
+                                    ; ~α
+                                    / (LogicalNegationToken WSP-ANY predicate)
+                                    / (GrouperOpeningToken WSP-ANY LogicalNegationToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
+                                    ; (α ∨ β)
+                                    / (predicate WSP-ANY LogicalDisjunctionToken WSP-ANY predicate)
+                                    / (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalDisjunctionToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
+                                    ; (α ⊃ β)
+                                    / (predicate WSP-ANY LogicalConditionalToken WSP-ANY predicate)
+                                    / (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalConditionalToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
 
-existential-quantifier-statement = existential-quantifier predicate
+existential-quantifier-statement    = ExistentialQuantifierToken predicate
 
-universal-quantifier-statement   = universal-quantifier predicate
+universal-quantifier-statement      = UniversalQuantifierToken predicate
 
-complex-statement                =/ existential-quantifier-statement 
-                                 / universal-quantifier-statement
+complex-statement                   =/ existential-quantifier-statement 
+                                    / universal-quantifier-statement
                                  
 ;;;
 ;;;
 ;;; RULES OF RELATIONAL PREDICATE LOGIC
 ;;;
 ;;;
-; SUPERSCRIPT-NUMBER defines any positive integer, leading zeros not allowed, in subscript
-SUPERSCRIPT-NUMBER               = ((%x00B9 / %x00B2-00B3 / %x2074-2079) [ SUPERSCRIPT-NUMBER ]) 
-                                 / (SUPERSCRIPT-NUMBER %x2070 [ SUPERSCRIPT-NUMBER ])
+;;;; Tokens
+;;;
+; defines, in superscript, any positive integer (leading zeros not allowed)
+SuperscriptNumber                   = ((%x00B9 / %x00B2-00B3 / %x2074-2079) [ SuperscriptNumber ])  ; 1-9
+                                    / (SuperscriptNumber %x2070 [ SuperscriptNumber ]) ; 0
 
-relation                         = UALPHA [ SUBSCRIPT-NUMBER ] SUPERSCRIPT-NUMBER
+Variable                            = %x78-7A [ SubscriptNumberToken ] ; x-z [ SubscriptNumberToken ]
 
-simple-predicate                 =/ relation ; extends existing definition to allow any value for superscript (positive integer, no leading zeros)
+;;;
+;;;; Expressions
+;;;
+relation                            = UALPHA [ SubscriptNumberToken ] SuperscriptNumber
+
+simple-predicate                    =/ relation ; extends existing definition to allow any value for superscript (positive integer, no leading zeros)
 
 ; singular-statement: any number of singular terms allowed here (except 0). 
 ; Because the number of singular terms = degree of relation cannot be well defined in a 
 ; context-free grammar, I'll leave only a note here and make sure the parser does its job.
-singular-statement               =/ relation 1*singular-term
-
-var                              = %x78-7A [ SUBSCRIPT-NUMBER ] ; x-z
-
-existential-quantifier-with-var  = existential-quantifier WHITESPACE var
-
-universal-quantifier-with-var    = universal-quantifier WHITESPACE var
-
-grouper-existential-quantifier   = "(" WHITESPACE existential-quantifier-with-var WHITESPACE ")"
-
-grouper-universal-quantifier     = "(" WHITESPACE universal-quantifier-with-var WHITESPACE ")"
+singular-statement                  =/ relation 1*SingularTermToken
 
 ; Same thing that was said for singular-statement is said here.
 ; Context-free grammars cannot correctly define the need for all predicates of degree >=1 to bind to the variable
-existential-quantifier-statement =/ (grouper-existential-quantifier predicate) 
-                                 / (existential-quantifier-with-var simple-predicate / compound-predicate))
+existential-quantifier-statement    =/ (ExistentialQuantifierToken WSP-ANY Variable WSP-ANY predicate)
+                                    / (GrouperOpeningToken WSP-ANY ExistentialQuantifierToken WSP-ANY Variable WSP-ANY GrouperClosingToken WSP-ANY predicate)
 
-universal-quantifier-statement   =/ (grouper-universal-quantifier predicate) 
-                                 / (universal-quantifier-with-var simple-predicate / compound-predicate))
+universal-quantifier-statement      =/ (UniversalQuantifierToken WSP-ANY Variable WSP-ANY predicate)
+                                    / (GrouperOpeningToken WSP-ANY UniversalQuantifierToken WSP-ANY Variable WSP-ANY GrouperClosingToken WSP-ANY predicate)
