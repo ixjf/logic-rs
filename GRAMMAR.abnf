@@ -6,6 +6,8 @@
 ; Any rule whose name is in capitals (w/ or wo/ dashes) is an extension to the core rules
 ;
 ; Any rule whose name is in dash-case (e.g. dash-case) is an expression definition
+;
+; Any rule whose name is in lower camel case is an internal definition
 
 UALPHA                              = %x41-5A ; A-Z
 
@@ -28,9 +30,9 @@ LogicalConjunctionToken             = "&"
 
 LogicalNegationToken                = "~"
 
-LogicalDisjunctionToken             = %x2228 ; where %x2228 = ∨
+LogicalDisjunctionToken             = %x2228 / "+" ; where %x2228 = ∨
 
-LogicalConditionalToken             = %x2283 ; where %x2283 = ⊃
+LogicalConditionalToken             = %x2283 / "->" ; where %x2283 = ⊃
 
 StatementSeparatorToken             = ","
 
@@ -43,8 +45,12 @@ SetClosingToken                     = "}"
 SimpleStatementToken                = UALPHA [ SubscriptNumberToken ]
 
 ; defines, in subscript, any positive integer (leading zeros not allowed)
-SubscriptNumberToken                = (%x2081-2089 [ SubscriptNumberToken ])
-                                    / (SubscriptNumberToken %x2080 [ SubscriptNumberToken ])
+SubscriptNumberToken                = ((%x2081-2089 [ SubscriptNumberToken ])
+                                       / (SubscriptNumberToken %x2080 [ SubscriptNumberToken ]))
+                                    / subscriptNumberTokenAscii
+
+subscriptNumberTokenAscii           = (%d1-9 [ subscriptNumberTokenAscii ])
+                                    / (subscriptNumberTokenAscii %d0 [ subscriptNumberTokenAscii ])
 
 ;;;
 ;;;; Expressions
@@ -77,14 +83,14 @@ statement                           = simple-statement / complex-statement
 ;;;
 SingularTermToken                   = %x61-77 [ SubscriptNumberToken ] ; a-w [ SubscriptNumberToken ]
 
-ExistentialQuantifierToken          = %x2203 ; where %x2203 = ∃
+ExistentialQuantifierToken          = %x2203 / "EXISTS" ; where %x2203 = ∃
 
-UniversalQuantifierToken            = %x2200 ; where %x2200 = ∀
+UniversalQuantifierToken            = %x2200 / "EVERY" ; where %x2200 = ∀
 
 ;;;
 ;;;; Expressions
 ;;;
-property-predicate                  = UALPHA [ SubscriptNumberToken ] %x00B9 ; where %x00B9 = ¹  (superscript numeral '1')
+property-predicate                  = UALPHA [ SubscriptNumberToken ] (%x00B9 / "^1") ; where %x00B9 = ¹  (superscript numeral '1')
 
 singular-statement                  = (property-predicate SingularTermToken) 
                                     / (GrouperOpeningToken WSP-ANY property-predicate SingularTermToken WSP-ANY GrouperClosingToken)
@@ -121,8 +127,12 @@ complex-statement                   =/ existential-quantifier-statement
 ;;;; Tokens
 ;;;
 ; defines, in superscript, any positive integer (leading zeros not allowed)
-SuperscriptNumberToken              = ((%x00B9 / %x00B2-00B3 / %x2074-2079) [ SuperscriptNumberToken ])  ; 1-9
-                                    / (SuperscriptNumberToken %x2070 [ SuperscriptNumberToken ]) ; 0
+SuperscriptNumberToken              = (((%x00B9 / %x00B2-00B3 / %x2074-2079) [ SuperscriptNumberToken ])  ; 1-9
+                                       / (SuperscriptNumberToken %x2070 [ SuperscriptNumberToken ])) ; 0
+                                    / superscriptNumberTokenAscii
+
+superscriptNumberTokenAscii         = (%d1-9 [ superscriptNumberTokenAscii ])
+                                    / (superscriptNumberTokenAscii %d0 [ superscriptNumberTokenAscii ])
 
 VariableToken                       = %x78-7A [ SubscriptNumberToken ] ; x-z [ SubscriptNumberToken ]
 
