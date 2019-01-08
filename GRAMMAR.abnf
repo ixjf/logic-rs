@@ -1,0 +1,126 @@
+;;;
+;;;
+;;; RULES REUSED HERE
+;;;
+;;;
+UALPHA                 = %x41-5A ; A-Z
+
+ ; SUBSCRIPT-NUMBER defines any positive integer, leading zeros not allowed, in subscript
+SUBSCRIPT-NUMBER       = (%x2081-2089 [ SUBSCRIPT-NUMBER ]) 
+                       / (SUBSCRIPT-NUMBER %x2080 [ SUBSCRIPT-NUMBER ])
+
+WHITESPACE             = *WSP ; 'WSP' from Core Rules defined in the reference RFC5234
+
+WHITESPACE-RETURN      = WHITESPACE / *CRLF ; 'CRLF' from Core Rules defined in the reference RFC5234
+
+;;;
+;;;
+;;; RULES OF PROPOSITIONAL LOGIC
+;;;
+;;;
+simple-statement       = (UALPHA [ SUBSCRIPT-NUMBER ]) 
+                       / ("(" WHITESPACE UALPHA [ SUBSCRIPT-NUMBER ] WHITESPACE ")")
+
+logical-conjunction    = "(" WHITESPACE statement WHITESPACE "&" WHITESPACE statement WHITESPACE ")"
+
+logical-negation       = ("~" WHITESPACE statement) 
+                       / ("(" WHITESPACE "~" WHITESPACE statement WHITESPACE ")") ; groupers aren't needed as it's unambiguous
+
+logical-disjunction    = "(" WHITESPACE statement WHITESPACE %x2228 WHITESPACE statement WHITESPACE ")" ; where %x2228 = ∨
+
+logical-conditional    = "(" WHITESPACE statement WHITESPACE %x2283 WHITESPACE statement WHITESPACE ")" ; where %x2283 = ⊃
+
+complex-statement      = logical-conjunction
+                       / logical-negation
+                       / logical-disjunction 
+                       / logical-conditional
+
+statement              = simple-statement / complex-statement
+
+;;;
+;;;
+;;; MAIN PARSING RULES
+;;;
+;;;
+statement-list         = statement 
+                       / (statement WHITESPACE "," WHITESPACE-RETURN statement-list)
+
+argument-conclusion    = ".:." WHITESPACE statement
+
+argument-premise-list  = statement-list
+
+argument               = argument-premise-list WHITESPACE-RETURN argument-conclusion
+
+statement-set          = "{" WHITESPACE-RETURN statement-list WHITESPACE-RETURN "}"
+
+input                  = argument / statement-set
+
+;;;
+;;;
+;;; RULES OF PROPERTY PREDICATE LOGIC
+;;;
+;;;
+singular-term                    = %x61-77 [ SUBSCRIPT-NUMBER ] ; a-w [ SUBSCRIPT-NUMBER ]
+
+property-predicate               = UALPHA [ SUBSCRIPT-NUMBER ] %x00B9 ; where %x00B9 = ¹  (superscript numeral '1')
+
+singular-statement               = (property-predicate singular-term) 
+                                 / ("(" WHITESPACE property-predicate singular-term WHITESPACE ")")
+
+simple-statement                 =/ singular-statement
+
+predicate                        = simple-predicate / compound-predicate
+
+simple-predicate                 = property-predicate
+
+compound-predicate               = ("(" WHITESPACE predicate WHITESPACE "&" WHITESPACE predicate WHITESPACE ")") 
+                                 / ("~" WHITESPACE predicate) 
+                                 / ("(" WHITESPACE predicate WHITESPACE %x2228 WHITESPACE predicate WHITESPACE ")")  ; where %x2228 = ∨
+                                 / ("(" WHITESPACE predicate WHITESPACE %x2283 WHITESPACE predicate WHITESPACE ")")  ; where %x2283 = ⊃
+
+existential-quantifier           = %x2203 ; where %x2203 = ∃
+
+universal-quantifier             = %x2200 ; where %x2200 = ∀
+
+existential-quantifier-statement = existential-quantifier predicate
+
+universal-quantifier-statement   = universal-quantifier predicate
+
+complex-statement                =/ existential-quantifier-statement 
+                                 / universal-quantifier-statement
+                                 
+;;;
+;;;
+;;; RULES OF RELATIONAL PREDICATE LOGIC
+;;;
+;;;
+; SUPERSCRIPT-NUMBER defines any positive integer, leading zeros not allowed, in subscript
+SUPERSCRIPT-NUMBER               = ((%x00B9 / %x00B2-00B3 / %x2074-2079) [ SUPERSCRIPT-NUMBER ]) 
+                                 / (SUPERSCRIPT-NUMBER %x2070 [ SUPERSCRIPT-NUMBER ])
+
+relation                         = UALPHA [ SUBSCRIPT-NUMBER ] SUPERSCRIPT-NUMBER
+
+simple-predicate                 =/ relation ; extends existing definition to allow any value for superscript (positive integer, no leading zeros)
+
+; singular-statement: any number of singular terms allowed here (except 0). 
+; Because the number of singular terms = degree of relation cannot be well defined in a 
+; context-free grammar, I'll leave only a note here and make sure the parser does its job.
+singular-statement               =/ relation 1*singular-term
+
+var                              = %x78-7A [ SUBSCRIPT-NUMBER ] ; x-z
+
+existential-quantifier-with-var  = existential-quantifier WHITESPACE var
+
+universal-quantifier-with-var    = universal-quantifier WHITESPACE var
+
+grouper-existential-quantifier   = "(" WHITESPACE existential-quantifier-with-var WHITESPACE ")"
+
+grouper-universal-quantifier     = "(" WHITESPACE universal-quantifier-with-var WHITESPACE ")"
+
+; Same thing that was said for singular-statement is said here.
+; Context-free grammars cannot correctly define the need for all predicates of degree >=1 to bind to the variable
+existential-quantifier-statement =/ (grouper-existential-quantifier predicate) 
+                                 / (existential-quantifier-with-var simple-predicate / compound-predicate))
+
+universal-quantifier-statement   =/ (grouper-universal-quantifier predicate) 
+                                 / (universal-quantifier-with-var simple-predicate / compound-predicate))
