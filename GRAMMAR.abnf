@@ -44,13 +44,14 @@ SetClosingToken                     = "}"
 
 SimpleStatementToken                = UALPHA [ SubscriptNumberToken ]
 
-; defines, in subscript, any positive integer (leading zeros not allowed)
-SubscriptNumberToken                = ((%x2081-2089 [ SubscriptNumberToken ])
-                                       / (SubscriptNumberToken %x2080 [ SubscriptNumberToken ]))
-                                    / subscriptNumberTokenAscii
+; defines any positive integer (leading zeros not allowed)
+SubscriptNumberToken                = unicodeSubscriptNumber / asciiNumber
 
-subscriptNumberTokenAscii           = (%d1-9 [ subscriptNumberTokenAscii ])
-                                    / (subscriptNumberTokenAscii %d0 [ subscriptNumberTokenAscii ])
+unicodeSubscriptNumber              = (%x2081-2089 [ unicodeSubscriptNumber ])
+                                    / (unicodeSubscriptNumber %x2080 [ unicodeSubscriptNumber ])
+
+asciiNumber                         = (%x31-39 [ asciiNumber ])
+                                    / (asciiNumber %x30 [ asciiNumber ])
 
 ;;;
 ;;;; Expressions
@@ -83,9 +84,9 @@ statement                           = simple-statement / complex-statement
 ;;;
 SingularTermToken                   = %x61-77 [ SubscriptNumberToken ] ; a-w [ SubscriptNumberToken ]
 
-ExistentialQuantifierToken          = %x2203 / "EXISTS" ; where %x2203 = ∃
+ExistentialQuantifierToken          = %x2203 / "EXISTS>" ; where %x2203 = ∃
 
-UniversalQuantifierToken            = %x2200 / "EVERY" ; where %x2200 = ∀
+UniversalQuantifierToken            = %x2200 / "EVERY>" ; where %x2200 = ∀
 
 ;;;
 ;;;; Expressions
@@ -126,13 +127,11 @@ complex-statement                   =/ existential-quantifier-statement
 ;;;
 ;;;; Tokens
 ;;;
-; defines, in superscript, any positive integer (leading zeros not allowed)
-SuperscriptNumberToken              = (((%x00B9 / %x00B2-00B3 / %x2074-2079) [ SuperscriptNumberToken ])  ; 1-9
-                                       / (SuperscriptNumberToken %x2070 [ SuperscriptNumberToken ])) ; 0
-                                    / superscriptNumberTokenAscii
+; defines any positive integer (leading zeros not allowed)
+SuperscriptNumberToken              = unicodeSuperscriptNumber / ("^" asciiNumber)
 
-superscriptNumberTokenAscii         = (%d1-9 [ superscriptNumberTokenAscii ])
-                                    / (superscriptNumberTokenAscii %d0 [ superscriptNumberTokenAscii ])
+unicodeSuperscriptNumber            = ((%x00B9 / %x00B2-00B3 / %x2074-2079) [ unicodeSuperscriptNumber ])  ; 1-9
+                                    / (unicodeSuperscriptNumber %x2070 [ unicodeSuperscriptNumber ]) ; 0
 
 VariableToken                       = %x78-7A [ SubscriptNumberToken ] ; x-z [ SubscriptNumberToken ]
 
