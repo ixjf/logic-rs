@@ -120,30 +120,32 @@ complex-statement                   =/ existential-quantifier-statement
 ;;;; Tokens
 ;;;
 ; defines, in superscript, any positive integer (leading zeros not allowed)
-SuperscriptNumber                   = ((%x00B9 / %x00B2-00B3 / %x2074-2079) [ SuperscriptNumber ])  ; 1-9
-                                    / (SuperscriptNumber %x2070 [ SuperscriptNumber ]) ; 0
+SuperscriptNumberToken              = ((%x00B9 / %x00B2-00B3 / %x2074-2079) [ SuperscriptNumberToken ])  ; 1-9
+                                    / (SuperscriptNumberToken %x2070 [ SuperscriptNumberToken ]) ; 0
 
-Variable                            = %x78-7A [ SubscriptNumberToken ] ; x-z [ SubscriptNumberToken ]
+VariableToken                       = %x78-7A [ SubscriptNumberToken ] ; x-z [ SubscriptNumberToken ]
+
+TermToken                           = SingularTermToken / VariableToken
 
 ;;;
 ;;;; Expressions
 ;;;
-relation                            = UALPHA [ SubscriptNumberToken ] SuperscriptNumber
+relation                            = UALPHA [ SubscriptNumberToken ] SuperscriptNumberToken
 
 simple-predicate                    =/ relation ; extends existing definition to allow any value for superscript (positive integer, no leading zeros)
 
 ; singular-statement: any number of singular terms allowed here (except 0). 
 ; Because the number of singular terms = degree of relation cannot be well defined in a 
 ; context-free grammar, I'll leave only a note here and make sure the parser does its job.
-singular-statement                  =/ relation 1*SingularTermToken
+singular-statement                  =/ relation 1*TermToken
 
 ; Same thing that was said for singular-statement is said here.
 ; Context-free grammars cannot correctly define the need for all predicates of degree >=1 to bind to the variable
-existential-quantifier-statement    =/ (ExistentialQuantifierToken WSP-ANY Variable WSP-ANY predicate)
-                                    / (GrouperOpeningToken WSP-ANY ExistentialQuantifierToken WSP-ANY Variable WSP-ANY GrouperClosingToken WSP-ANY predicate)
+existential-quantifier-statement    =/ (ExistentialQuantifierToken WSP-ANY VariableToken WSP-ANY predicate)
+                                    / (GrouperOpeningToken WSP-ANY ExistentialQuantifierToken WSP-ANY VariableToken WSP-ANY GrouperClosingToken WSP-ANY predicate)
 
-universal-quantifier-statement      =/ (UniversalQuantifierToken WSP-ANY Variable WSP-ANY predicate)
-                                    / (GrouperOpeningToken WSP-ANY UniversalQuantifierToken WSP-ANY Variable WSP-ANY GrouperClosingToken WSP-ANY predicate)
+universal-quantifier-statement      =/ (UniversalQuantifierToken WSP-ANY VariableToken WSP-ANY predicate)
+                                    / (GrouperOpeningToken WSP-ANY UniversalQuantifierToken WSP-ANY VariableToken WSP-ANY GrouperClosingToken WSP-ANY predicate)
 
 ;;;
 ;;;
