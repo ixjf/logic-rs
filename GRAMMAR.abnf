@@ -99,6 +99,7 @@ compound-predicate                  =
                                     ; (α & β)
                                       (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalConjunctionToken WSP-ANY predicate WSP-ANY GrouperClosingToken) 
                                     ; ~α
+                                    / (LogicalNegationToken WSP-ANY predicate)
                                     / (GrouperOpeningToken WSP-ANY LogicalNegationToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
                                     ; (α ∨ β)
                                     / (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalDisjunctionToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
