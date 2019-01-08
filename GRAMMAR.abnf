@@ -54,7 +54,8 @@ simple-statement                    = SimpleStatementToken
 
 logical-conjunction                 = (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalConjunctionToken WSP-ANY statement WSP-ANY GrouperClosingToken)
 
-logical-negation                    = (GrouperOpeningToken WSP-ANY LogicalNegationToken WSP-ANY statement WSP-ANY GrouperClosingToken) ; groupers aren't needed as it's unambiguous
+logical-negation                    = (LogicalNegationToken WSP-ANY statement)
+                                    / (GrouperOpeningToken WSP-ANY LogicalNegationToken WSP-ANY statement WSP-ANY GrouperClosingToken) ; groupers aren't needed as it's unambiguous
 
 logical-disjunction                 = (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalDisjunctionToken WSP-ANY statement WSP-ANY GrouperClosingToken)
 
