@@ -68,20 +68,6 @@ complex-statement                   = logical-conjunction
 
 statement                           = simple-statement / complex-statement
 
-statement-list                      = statement 
-                                    / (statement WSP-ANY StatementSeparatorToken WSP-CRLF-ANY statement-list)
-
-argument-conclusion                 = ConclusionIndicatorToken WSP-ANY statement
-
-argument-premise-list               = statement-list
-
-argument                            = argument-premise-list WSP-CRLF-ANY argument-conclusion
-
-statement-set                       = SetOpeningToken WSP-CRLF-ANY statement-list WSP-CRLF-ANY SetClosingToken
-
-;;; rpl-rs specific rule
-input                               = argument / statement-set
-
 ;;;
 ;;;
 ;;; RULES OF PROPERTY PREDICATE LOGIC
@@ -158,3 +144,21 @@ existential-quantifier-statement    =/ (ExistentialQuantifierToken WSP-ANY Varia
 
 universal-quantifier-statement      =/ (UniversalQuantifierToken WSP-ANY Variable WSP-ANY predicate)
                                     / (GrouperOpeningToken WSP-ANY UniversalQuantifierToken WSP-ANY Variable WSP-ANY GrouperClosingToken WSP-ANY predicate)
+
+;;;
+;;;
+;;; COMMON RULES
+;;;
+;;;
+statement-list                      = statement 
+                                    / (statement WSP-ANY StatementSeparatorToken WSP-CRLF-ANY statement-list)
+
+argument-conclusion                 = ConclusionIndicatorToken WSP-ANY statement
+
+argument-premise-list               = statement-list
+
+argument                            = argument-premise-list WSP-CRLF-ANY argument-conclusion
+
+statement-set                       = SetOpeningToken WSP-CRLF-ANY statement-list WSP-CRLF-ANY SetClosingToken
+
+input                               = argument / statement-set
