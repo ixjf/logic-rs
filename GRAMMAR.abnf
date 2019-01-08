@@ -137,7 +137,7 @@ simple-predicate                    =/ relation ; extends existing definition to
 ; singular-statement: any number of singular terms allowed here (except 0). 
 ; Because the number of singular terms = degree of relation cannot be well defined in a 
 ; context-free grammar, I'll leave only a note here and make sure the parser does its job.
-singular-statement                  =/ relation 1*TermToken
+singular-statement                  =/ relation 1*TermToken ; variables only allowed in quantifiers, though
 
 ; Same thing that was said for singular-statement is said here.
 ; Context-free grammars cannot correctly define the need for all predicates of degree >=1 to bind to the variable
