@@ -52,17 +52,13 @@ SubscriptNumberToken                = (%x2081-2089 [ SubscriptNumberToken ])
 simple-statement                    = SimpleStatementToken
                                     / (GrouperOpeningToken WSP-ANY SimpleStatementToken WSP-ANY GrouperClosingToken)
 
-logical-conjunction                 = (statement WSP-ANY LogicalConjunctionToken WSP-ANY statement) ; syntatically allowed but more than likely ambiguous
-                                    / (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalConjunctionToken WSP-ANY statement WSP-ANY GrouperClosingToken)
+logical-conjunction                 = (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalConjunctionToken WSP-ANY statement WSP-ANY GrouperClosingToken)
 
-logical-negation                    = (LogicalNegationToken WSP-ANY statement) 
-                                    / (GrouperOpeningToken WSP-ANY LogicalNegationToken WSP-ANY statement WSP-ANY GrouperClosingToken) ; groupers aren't needed as it's unambiguous
+logical-negation                    = (GrouperOpeningToken WSP-ANY LogicalNegationToken WSP-ANY statement WSP-ANY GrouperClosingToken) ; groupers aren't needed as it's unambiguous
 
-logical-disjunction                 = (statement WSP-ANY LogicalDisjunctionToken WSP-ANY statement) ; syntatically allowed but more than likely ambiguous
-                                    / (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalDisjunctionToken WSP-ANY statement WSP-ANY GrouperClosingToken)
+logical-disjunction                 = (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalDisjunctionToken WSP-ANY statement WSP-ANY GrouperClosingToken)
 
-logical-conditional                 = (statement WSP-ANY LogicalConditionalToken WSP-ANY statement) ; syntatically allowed but more than likely ambiguous
-                                    / (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalConditionalToken WSP-ANY statement WSP-ANY GrouperClosingToken)
+logical-conditional                 = (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalConditionalToken WSP-ANY statement WSP-ANY GrouperClosingToken)
 
 complex-statement                   = logical-conjunction
                                     / logical-negation
@@ -114,16 +110,12 @@ simple-predicate                    = property-predicate
 
 compound-predicate                  = 
                                     ; (α & β)
-                                      (predicate WSP-ANY LogicalConjunctionToken WSP-ANY predicate)
-                                    / (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalConjunctionToken WSP-ANY predicate WSP-ANY GrouperClosingToken) 
+                                      (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalConjunctionToken WSP-ANY predicate WSP-ANY GrouperClosingToken) 
                                     ; ~α
-                                    / (LogicalNegationToken WSP-ANY predicate)
                                     / (GrouperOpeningToken WSP-ANY LogicalNegationToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
                                     ; (α ∨ β)
-                                    / (predicate WSP-ANY LogicalDisjunctionToken WSP-ANY predicate)
                                     / (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalDisjunctionToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
                                     ; (α ⊃ β)
-                                    / (predicate WSP-ANY LogicalConditionalToken WSP-ANY predicate)
                                     / (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalConditionalToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
 
 existential-quantifier-statement    = ExistentialQuantifierToken predicate
