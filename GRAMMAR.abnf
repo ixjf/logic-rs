@@ -1,176 +1,196 @@
-; Follows ABNF syntax as defined here: http://www.rfc-editor.org/rfc/rfc5234.txt
-; Core Rules are used here
+; ABNF syntax is as defined in RFC5234: http://www.rfc-editor.org/rfc/rfc5234.txt
 
-; Any rule whose name is in upper camel case is a token definition
-;
-; Any rule whose name is in capitals (w/ or wo/ dashes) is an extension to the core rules
-;
-; Any rule whose name is in dash-case (e.g. dash-case) is an expression definition
-;
-; Any rule whose name is in lower camel case is an internal definition
+; redefinition of rules may or may not be illegal but pretend that it isn't
+; just this once
 
 UALPHA                              = %x41-5A ; A-Z
 
-WSP-ANY                             = *WSP
 
-WSP-CRLF-ANY                        = WSP-ANY / *CRLF
+; Propositional Logic Grammar
+; Rule 5
+grouper-opening                     = "("
 
-;;;
-;;;
-;;; RULES OF PROPOSITIONAL LOGIC
-;;;
-;;;
-;;;; Tokens
-;;;
-GrouperOpeningToken                 = "("
+grouper-closing                     = ")"
 
-GrouperClosingToken                 = ")"
+grouper                             = grouper-opening formula grouper-closing
 
-LogicalConjunctionToken             = "&"
+; Rule 6
+; allows any positive integer written in unicode subscript but disallows leading zeros
+subscript-number                    = (%x2081-2089 [subscript-number]) ; 1-9
+                                    / (subscript-number %x2080 [subscript-number]) ; 0
 
-LogicalNegationToken                = "~"
+simple-statement                    = UALPHA [subscript-number] ; defines the instantiation of a simple statement
 
-LogicalDisjunctionToken             = %x2228 / "+" ; where %x2228 = ∨
+; Rules 7 & 11
+conjunction-connective              = "&"
 
-LogicalConditionalToken             = %x2283 / "->" ; where %x2283 = ⊃
+logical-conjunction                 = grouper-opening statement conjunction-connective statement grouper-closing
 
-StatementSeparatorToken             = ","
+; Rule 8
+negation-connective                 = "~"
 
-ConclusionIndicatorToken            = ".:."
+logical-negation                    = negation-connective statement
 
-SetOpeningToken                     = "{"
+; Rules 9 & 11
+disjunction-connective              = %x2228 ; ∨
 
-SetClosingToken                     = "}"
+logical-disjunction                 = grouper-opening statement disjunction-connective statement grouper-closing
 
-SimpleStatementToken                = UALPHA [ SubscriptNumberToken ]
+; Rules 10 & 11
+conditional-connective              = %x2283 ; ⊃
 
-; defines any positive integer (leading zeros not allowed)
-SubscriptNumberToken                = unicodeSubscriptNumber / asciiNumber
+logical-conditional                 = grouper-opening statement conditional-connective statement grouper-closing
 
-unicodeSubscriptNumber              = (%x2081-2089 [ unicodeSubscriptNumber ])
-                                    / (unicodeSubscriptNumber %x2080 [ unicodeSubscriptNumber ])
-
-asciiNumber                         = (%x31-39 [ asciiNumber ])
-                                    / (asciiNumber %x30 [ asciiNumber ])
-
-;;;
-;;;; Expressions
-;;;
-simple-statement                    = SimpleStatementToken
-                                    / (GrouperOpeningToken WSP-ANY SimpleStatementToken WSP-ANY GrouperClosingToken)
-
-logical-conjunction                 = (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalConjunctionToken WSP-ANY statement WSP-ANY GrouperClosingToken)
-
-logical-negation                    = (LogicalNegationToken WSP-ANY statement)
-                                    / (GrouperOpeningToken WSP-ANY LogicalNegationToken WSP-ANY statement WSP-ANY GrouperClosingToken) ; groupers aren't needed as it's unambiguous
-
-logical-disjunction                 = (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalDisjunctionToken WSP-ANY statement WSP-ANY GrouperClosingToken)
-
-logical-conditional                 = (GrouperOpeningToken WSP-ANY statement WSP-ANY LogicalConditionalToken WSP-ANY statement WSP-ANY GrouperClosingToken)
-
+; Rule 12
 complex-statement                   = logical-conjunction
                                     / logical-negation
-                                    / logical-disjunction 
+                                    / logical-disjunction
                                     / logical-conditional
 
+; Rule 14
 statement                           = simple-statement / complex-statement
 
-;;;
-;;;
-;;; RULES OF PROPERTY PREDICATE LOGIC
-;;;
-;;;
-;;;; Tokens
-;;;
-SingularTermToken                   = %x61-77 [ SubscriptNumberToken ] ; a-w [ SubscriptNumberToken ]
+; Rule 13
+formula                             = simple-statement / complex-statement / grouper
 
-ExistentialQuantifierToken          = %x2203 / "EXISTS>" ; where %x2203 = ∃
+; Rule 3
+; I'm aware there are repetitions here. However, the redundancy is there deliberately
+; because an expression is ANYTHING that has a well-defined meaning
+; e.g. statements have a well-defined meaning, in that they are simple or complex
+; statements, and simple or complex statements also each have their own well-defined meaning
+expression                          = grouper-opening
+                                    / grouper-closing
+                                    / grouper
+                                    / simple-statement
+                                    / conjunction-connective
+                                    / logical-conjunction
+                                    / negation-connective
+                                    / logical-negation
+                                    / disjunction-connective
+                                    / logical-disjunction
+                                    / conditional-connective
+                                    / logical-conditional
+                                    / complex-statement
+                                    / statement
+                                    / formula
 
-UniversalQuantifierToken            = %x2200 / "EVERY>" ; where %x2200 = ∀
 
-;;;
-;;;; Expressions
-;;;
-property-predicate                  = UALPHA [ SubscriptNumberToken ] (%x00B9 / "^1") ; where %x00B9 = ¹  (superscript numeral '1')
+; Property Predicate Logic Grammar
+; Rule 1
+singular-term                       = %x61-77 [subscript-number] ; where %x61-77 = a-w ; defines the instantiation of a singular term
 
-singular-statement                  = (property-predicate SingularTermToken) 
-                                    / (GrouperOpeningToken WSP-ANY property-predicate SingularTermToken WSP-ANY GrouperClosingToken)
+; Rule 2
+term                                = singular-term
 
+; Rule 3
+property-predicate                  = UALPHA [subscript-number] %x00B9 ; where %x00B9 = superscript numeral '1' ; defines the instantiation of a property predicate
+
+; Rule 4
+singular-statement                  = property-predicate singular-term
+
+; Rule 5
 simple-statement                    =/ singular-statement
 
+; Rules 6 & 7
 predicate                           = simple-predicate / compound-predicate
 
 simple-predicate                    = property-predicate
 
-compound-predicate                  = 
-                                    ; (α & β)
-                                      (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalConjunctionToken WSP-ANY predicate WSP-ANY GrouperClosingToken) 
-                                    ; ~α
-                                    / (LogicalNegationToken WSP-ANY predicate)
-                                    / (GrouperOpeningToken WSP-ANY LogicalNegationToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
-                                    ; (α ∨ β)
-                                    / (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalDisjunctionToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
-                                    ; (α ⊃ β)
-                                    / (GrouperOpeningToken WSP-ANY predicate WSP-ANY LogicalConditionalToken WSP-ANY predicate WSP-ANY GrouperClosingToken)
+compound-predicate                  = (grouper-opening predicate conjunction-connective predicate grouper-closing) ; conjunction
+                                    / (negation-connective predicate) ; negation
+                                    / (grouper-opening predicate disjunction-connective predicate grouper-closing) ; disjunction
+                                    / (grouper-opening predicate conditional-connective predicate grouper-closing) ; conditional
 
-existential-quantifier-statement    = ExistentialQuantifierToken WSP-ANY predicate
+; Rule 8
+formula                             =/ (simple-predicate 1*term)
+                                    / compound-predicate
 
-universal-quantifier-statement      = UniversalQuantifierToken WSP-ANY predicate
+; Rule 9
+existential-quantifier              = %x2203 ; where %x2203 = ∃
 
-complex-statement                   =/ existential-quantifier-statement 
+existential-quantifier-statement    = existential-quantifier predicate
+
+; Rule 10
+universal-quantifier                = %x2200 ; where %x2200 = ∀
+
+universal-quantifier-statement      = universal-quantifier predicate
+
+; Rule 11
+complex-statement                   =/ existential-quantifier-statement
                                     / universal-quantifier-statement
-                                 
-;;;
-;;;
-;;; RULES OF RELATIONAL PREDICATE LOGIC
-;;;
-;;;
-;;;; Tokens
-;;;
-; defines any positive integer (leading zeros not allowed)
-SuperscriptNumberToken              = unicodeSuperscriptNumber / ("^" asciiNumber)
 
-unicodeSuperscriptNumber            = ((%x00B9 / %x00B2-00B3 / %x2074-2079) [ unicodeSuperscriptNumber ])  ; 1-9
-                                    / (unicodeSuperscriptNumber %x2070 [ unicodeSuperscriptNumber ]) ; 0
+; Rule 3 of PL
+; see definition of Rule 3 of PL above for comments on redundancy
+expression                          =/ singular-term
+                                    / term
+                                    / property-predicate
+                                    / singular-statement
+                                    / predicate
+                                    / simple-predicate
+                                    / compound-predicate
+                                    / existential-quantifier
+                                    / existential-quantifier-statement
+                                    / universal-quantifier
+                                    / universal-quantifier-statement
 
-VariableToken                       = %x78-7A [ SubscriptNumberToken ] ; x-z [ SubscriptNumberToken ]
 
-TermToken                           = SingularTermToken / VariableToken
+; Relational Predicate Logic Grammar
+; Rule 1
+superscript-number                  = ((%x00B9 / %x00B2-00B3 / %x2074-2079) [superscript-number]) ; 1-9
+                                    / (superscript-number %x2070 [superscript-number]) ; 0
 
-;;;
-;;;; Expressions
-;;;
-relation                            = UALPHA [ SubscriptNumberToken ] SuperscriptNumberToken
+relation                            = UALPHA [subscript-number] superscript-number *term ; defines the instantiation of a relation
 
-simple-predicate                    =/ relation ; extends existing definition to allow any value for superscript (positive integer, no leading zeros)
+singular-statement                  = relation 1*singular-term ;;; how does ABNF handle this? does it think of singular-statement as a relation?
 
-; singular-statement: any number of singular terms allowed here (except 0). 
-; Because the number of singular terms = degree of relation cannot be well defined in a 
-; context-free grammar, I'll leave only a note here and make sure the parser does its job.
-singular-statement                  =/ relation 1*TermToken ; variables only allowed in quantifiers, though
+simple-predicate                    = relation
 
-; Same thing that was said for singular-statement is said here.
-; Context-free grammars cannot correctly define the need for all predicates of degree >=1 to bind to the variable
-existential-quantifier-statement    =/ (ExistentialQuantifierToken WSP-ANY VariableToken WSP-ANY predicate)
-                                    / (GrouperOpeningToken WSP-ANY ExistentialQuantifierToken WSP-ANY VariableToken WSP-ANY GrouperClosingToken WSP-ANY predicate)
+; Rule 3
+variable                            = %x78-7A [subscript-number] ; where %x78-7A = x-z
 
-universal-quantifier-statement      =/ (UniversalQuantifierToken WSP-ANY VariableToken WSP-ANY predicate)
-                                    / (GrouperOpeningToken WSP-ANY UniversalQuantifierToken WSP-ANY VariableToken WSP-ANY GrouperClosingToken WSP-ANY predicate)
+; Rule 4
+term                                =/ variable
 
-;;;
-;;;
-;;; COMMON RULES
-;;;
-;;;
-statement-list                      = statement 
-                                    / (statement WSP-ANY StatementSeparatorToken WSP-CRLF-ANY statement-list)
+; Rule 5
+; I could enforce here that a predicate must be made of unbound relations,
+; but it would only introduce unnecessary complexity
+; you may read https://github.com/ixjf/rpl-rs/wiki/Language/ for info on this
+existential-quantifier-statement    = existential-quantifier variable predicate
+universal-quantifier-statement      = universal-quantifier variable predicate
 
-argument-conclusion                 = ConclusionIndicatorToken WSP-ANY statement
+; Rule 3 of PL
+; see definition of Rule 3 of PL above for comments on redundancy
+expression                          =/ relation
+                                    / variable
 
-argument-premise-list               = statement-list
 
-argument                            = argument-premise-list WSP-CRLF-ANY argument-conclusion
+; Interpreter-specific Grammar
+; Rule 1
+expression                          =/ (*WSP / *CRLF) expression (*WSP / *CRLF)
 
-statement-set                       = SetOpeningToken WSP-CRLF-ANY statement-list WSP-CRLF-ANY SetClosingToken
+; Rule 2
+statement-set-opening               = "{"
 
-input                               = argument / statement-set
+statement-set-closing               = "}"
+
+statement-separator                 = ","
+
+statement-set                       = statement-set-opening statement *(statement-separator statement) statement-set-closing
+
+; Rule 3
+argument-conclusion-indicator       = ".:."
+
+argument                            = (statement *(statement-separator statement)) argument-conclusion-indicator statement
+
+; Rule 4
+input                               = statement-set / argument
+
+; Rule 3 of PL
+; see definition of Rule 3 of PL above for comments on redundancy
+expression                          =/ statement-set
+                                    / argument
+                                    / argument-conclusion-indicator
+                                    / statement-set-opening
+                                    / statement-set-closing
+                                    / statement-separator
+                                    / input
