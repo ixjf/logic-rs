@@ -51,7 +51,7 @@ complex-statement                   = logical-conjunction
 statement                           = simple-statement / complex-statement
 
 ; Rule 13
-formula                             = simple-statement / complex-statement / grouper
+formula                             = simple-statement / complex-statement
 
 ; Rule 3
 ; I'm aware there are repetitions here. However, the redundancy is there deliberately
