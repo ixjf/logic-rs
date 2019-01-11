@@ -1,0 +1,6 @@
+[package]
+name = "rpl-rs"
+version = "0.1.0"
+authors = ["Pedro Fanha <ixjf@outlook.com>"]
+
+[dependencies]

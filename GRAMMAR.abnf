@@ -3,14 +3,14 @@
 ; redefinition of rules may or may not be illegal but pretend that it isn't
 ; just this once
 
-UALPHA                              = %x41-5A ; A-Z
+UPPERALPHA                          = %x41-5A ; A-Z
 
 
 ; Propositional Logic Grammar
 ; Rule 5
-grouper-opening                     = "("
+grouper-opening                     = "(" ; lexer grammar
 
-grouper-closing                     = ")"
+grouper-closing                     = ")" ; lexer grammar
 
 grouper                             = grouper-opening formula grouper-closing
 
@@ -19,25 +19,25 @@ grouper                             = grouper-opening formula grouper-closing
 subscript-number                    = (%x2081-2089 [subscript-number]) ; 1-9
                                     / (subscript-number %x2080 [subscript-number]) ; 0
 
-simple-statement                    = UALPHA [subscript-number] ; defines the instantiation of a simple statement
+simple-statement                    = UPPERALPHA [subscript-number] ; lexer token ; defines the instantiation of a simple statement
 
 ; Rules 7 & 11
-conjunction-connective              = "&"
+conjunction-connective              = "&" ; lexer grammar
 
 logical-conjunction                 = grouper-opening statement conjunction-connective statement grouper-closing
 
 ; Rule 8
-negation-connective                 = "~"
+negation-connective                 = "~" ; lexer grammar
 
 logical-negation                    = negation-connective statement
 
 ; Rules 9 & 11
-disjunction-connective              = %x2228 ; ∨
+disjunction-connective              = %x2228 ; ∨ ; lexer grammar
 
 logical-disjunction                 = grouper-opening statement disjunction-connective statement grouper-closing
 
 ; Rules 10 & 11
-conditional-connective              = %x2283 ; ⊃
+conditional-connective              = %x2283 ; ⊃ ; lexer grammar
 
 logical-conditional                 = grouper-opening statement conditional-connective statement grouper-closing
 
@@ -77,13 +77,13 @@ expression                          = grouper-opening
 
 ; Property Predicate Logic Grammar
 ; Rule 1
-singular-term                       = %x61-77 [subscript-number] ; where %x61-77 = a-w ; defines the instantiation of a singular term
+singular-term                       = %x61-77 [subscript-number] ; lexer grammar ; where %x61-77 = a-w ; defines the instantiation of a singular term
 
 ; Rule 2
 term                                = singular-term
 
 ; Rule 3
-property-predicate                  = UALPHA [subscript-number] %x00B9 ; where %x00B9 = superscript numeral '1' ; defines the instantiation of a property predicate
+property-predicate                  = UPPERALPHA [subscript-number] %x00B9 ; lexer grammar ; where %x00B9 = superscript numeral '1' ; defines the instantiation of a property predicate
 
 ; Rule 4
 singular-statement                  = property-predicate singular-term
@@ -106,12 +106,12 @@ formula                             =/ (simple-predicate 1*term)
                                     / compound-predicate
 
 ; Rule 9
-existential-quantifier              = %x2203 ; where %x2203 = ∃
+existential-quantifier              = %x2203 ; lexer grammar ; where %x2203 = ∃
 
 existential-quantifier-statement    = existential-quantifier predicate
 
 ; Rule 10
-universal-quantifier                = %x2200 ; where %x2200 = ∀
+universal-quantifier                = %x2200 ; lexer grammar ; where %x2200 = ∀
 
 universal-quantifier-statement      = universal-quantifier predicate
 
@@ -139,7 +139,7 @@ expression                          =/ singular-term
 superscript-number                  = ((%x00B9 / %x00B2-00B3 / %x2074-2079) [superscript-number]) ; 1-9
                                     / (superscript-number %x2070 [superscript-number]) ; 0
 
-relation                            = UALPHA [subscript-number] superscript-number *term ; defines the instantiation of a relation
+relation                            = UPPERALPHA [subscript-number] superscript-number *term ; lexer grammar ; defines the instantiation of a relation
 
 singular-statement                  = relation 1*singular-term ;;; how does ABNF handle this? does it think of singular-statement as a relation?
 
@@ -166,7 +166,7 @@ expression                          =/ relation
 
 ; Interpreter-specific Grammar
 ; Rule 1
-expression                          =/ (*WSP / *CRLF) expression (*WSP / *CRLF)
+expression                          =/ (*WSP / *CR / *LF) expression (*WSP / *CR / *LF)
 
 ; Rule 2
 statement-set-opening               = "{"
