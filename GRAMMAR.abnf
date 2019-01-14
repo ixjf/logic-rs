@@ -175,12 +175,14 @@ statement-set-closing               = "}"
 
 statement-separator                 = ","
 
-statement-set                       = statement-set-opening statement *(statement-separator statement) statement-set-closing
+statement-set                       = statement-set-opening (statement *(statement-separator statement)) statement-set-closing
 
 ; Rule 3
 argument-conclusion-indicator       = ".:."
 
-argument                            = (statement *(statement-separator statement)) argument-conclusion-indicator statement
+argument-conclusion                 = argument-conclusion-indicator statement
+
+argument                            = (statement *(statement-separator statement)) argument-conclusion
 
 ; Rule 4
 input                               = statement-set / argument
