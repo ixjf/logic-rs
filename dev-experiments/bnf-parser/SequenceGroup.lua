@@ -16,11 +16,11 @@ function SequenceGroup:initialize(...)
     for i, v in ipairs(self.elements) do
         if type(v) ~= "number" and 
            type(v) ~= "string" and
-           (type(v.isInstanceOf) ~= "function" or not v:isInstanceOf(Alternatives)) and
-           (type(v.isInstanceOf) ~= "function" or not v:isInstanceOf(Repeat)) and
-           (type(v.isInstanceOf) ~= "function" or not v:isInstanceOf(Optional)) and
-           (type(v.isInstanceOf) ~= "function" or not v:isInstanceOf(Range)) and
-           (type(v.isInstanceOf) ~= "function" or not v:isInstanceOf(Char))
+           not Alternatives.isInstanceOf(v, Alternatives) and
+           not Repeat.isInstanceOf(v, Repeat) and
+           not Optional.isInstanceOf(v, Optional) and
+           not Range.isInstanceOf(v, Range) and
+           not Char.isInstanceOf(v, Char)
         then
             error("invalid element specified at index " .. i, 2)
         end

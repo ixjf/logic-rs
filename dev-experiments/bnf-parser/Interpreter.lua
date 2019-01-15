@@ -11,7 +11,7 @@ local SequenceGroup = SequenceGroup or require "SequenceGroup"
 local Char = Char or require "Char"
 
 function Interpreter:initialize(grammar)
-    if type(grammar.isInstanceOf) ~= "function" or not grammar:isInstanceOf(Grammar) then
+    if not Grammar.isInstanceOf(grammar, Grammar) then
         error("invalid value type for arg 'input'", 2)
     end
 
@@ -23,7 +23,9 @@ function Interpreter:parse(input, start_rule_name)
         error("invalid value type for arg 'input'", 2)
     end
 
-    if self.grammar:all_rules()[start_rule_name] == nil then
+    local start_rule = self.grammar:all_rules()[start_rule_name]
+
+    if start_rule == nil then
         error("start rule specified does not exist", 2)
     end
 
@@ -31,26 +33,14 @@ function Interpreter:parse(input, start_rule_name)
         input_position = 1
     }
 
-    return self:parse_rule(input, start_rule_name, parse_state)
-
-    -- TODO: This alternatives code cannot be here
-    -- in parse_rule we try to parse rules that may have alternatives in them...
-    --[[for _, alternative in ipairs(self.grammar:alternatives(start_rule_name)) do
-        success = self:parse_rule(input, alternative, parse_state)
-    
-        if success == true then
-            break
-        end
-    end
-
-    return success]]
+    return self:parse_sequence_group(input, start_rule, parse_state)
     -- return parse tree
 end
 
-function Interpreter:parse_rule(input, rule_name, parse_state)
+function Interpreter:parse_sequence_group(input, sequence_group, parse_state)
     -- TODO: ERROR MESSAGES!
     assert(type(input) == "string")
-    assert(type(self.grammar:all_rules()[rule_name].isInstanceOf) == "function" and self.grammar:all_rules()[rule_name]:isInstanceOf(SequenceGroup))
+    assert(SequenceGroup.isInstanceOf(sequence_group, SequenceGroup))
     assert(type(parse_state) == "table")
 
     -- TODO: This isn't going to work if two rules begin with the same sequence
@@ -59,69 +49,87 @@ function Interpreter:parse_rule(input, rule_name, parse_state)
     -- An input of 'rule2' is going to match rule4 and stop, even though there's still input
     -- What we need to do here is make sure the ENTIRE input matches, so we probably
     -- need to turn this around (instead of iterating over rules, iterate over the characters)
-    for _, alternative in ipairs(self.grammar:alternatives(rule_name)) do
-        local matched_rule = false
 
-        local new_parse_state = {
-            input_position = parse_state.input_position
-        }
+    local matched_rule = false
 
-        for i, element in ipairs(alternative:all_elements()) do
-            if type(element) == "string" then
-                local res = self:parse_rule(input, element, new_parse_state)
+    local new_parse_state = {
+        input_position = parse_state.input_position
+    }
+
+    for i, element in ipairs(sequence_group:all_elements()) do
+        if type(element) == "string" then
+            local seq_group = self.grammar:all_rules()[element]
+            assert(type(seq_group) ~= "nil")
+
+            local res = self:parse_sequence_group(input, seq_group, new_parse_state)
+
+            if res == false then
+                matched_rule = false
+                break
+            end
+
+            matched_rule = true
+        elseif Alternatives.isInstanceOf(element, Alternatives) then
+            for _, alt in ipairs(element:alternatives()) do
+                assert(SequenceGroup.isInstanceOf(alt, SequenceGroup))
+
+                local res = self:parse_sequence_group(input, alt, new_parse_state)
+
+                if res == true then
+                    matched_rule = true
+                    break
+                end
+            end
+
+            if matched_alt == false then
+                matched_rule = false
+                break
+            end
+        else
+            local curr_input_char = utf8.char(utf8.codepoint(input, utf8.offset(input, new_parse_state.input_position)))
+
+            -- We've reached the end of the input stream prematurely
+            if type(curr_input_char) == "nil" then
+                return false -- TODO!
+            end
+
+            if Char.isInstanceOf(element, Char) then
+                local res = element:try_match(curr_input_char)
 
                 if res == false then
                     matched_rule = false
                     break
                 end
 
+                new_parse_state.input_position = new_parse_state.input_position + 1
                 matched_rule = true
-            elseif type(element.isInstanceOf) == "function" then
-                local curr_input_char = utf8.char(utf8.codepoint(input, utf8.offset(input, new_parse_state.input_position)))
+            elseif Range.isInstanceOf(element, Range) then
+                local res = element:try_match(curr_input_char)
 
-                -- We've reached the end of the input stream prematurely
-                if type(curr_input_char) == "nil" then
-                    return false -- TODO!
+                if res == false then
+                    matched_rule = false
+                    break
                 end
 
-                if element:isInstanceOf(Char) then
-                    local res = element:try_match(curr_input_char)
-
-                    if res == false then
-                        matched_rule = false
-                        break
-                    end
-
-                    new_parse_state.input_position = new_parse_state.input_position + 1
-                    matched_rule = true
-                elseif element:isInstanceOf(Range) then
-                    local res = element:try_match(curr_input_char)
-
-                    if res == false then
-                        matched_rule = false
-                        break
-                    end
-
-                    new_parse_state.input_position = new_parse_state.input_position + 1
-                    matched_rule = true
-                --[[elseif element:isInstanceOf(Repeat) then
-                    local count = 0
-                    local min = element:min()
-                    local max = element:max()
-                    local repeat_element = element:element()]]
-                -- TODO: Optionals & repeat
-                else
-                    assert(false)
-                end
+                new_parse_state.input_position = new_parse_state.input_position + 1
+                matched_rule = true
+            --[[elseif element:isInstanceOf(Repeat) then
+                local count = 0
+                local min = element:min()
+                local max = element:max()
+                local repeat_element = element:element()]]
+            -- TODO: Optionals & repeat
+            else
+                assert(false)
             end
         end
-
-        if matched_rule == true then -- if we finished and matched_rule is true, then the alternative matches and we don't need to look at any others
-            parse_state.input_position = new_parse_state.input_position
-            return true
-        end
-        -- else continue on
     end
+
+    if matched_rule == true then -- if we finished and matched_rule is true, then the alternative matches and we don't need to look at any others
+        parse_state.input_position = new_parse_state.input_position
+        return true
+    end
+    -- else continue on
 
     return false
 end

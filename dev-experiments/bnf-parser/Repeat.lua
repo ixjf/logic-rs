@@ -2,13 +2,16 @@ local class = require "middleclass"
 
 Repeat = class "Repeat"
 
+local Alternatives = Alternatives or require "Alternatives"
+local Range = Range or require "Range"
+local Char = Char or require "Char"
+
 function Repeat:initialize(element, min, max)
     if type(element) ~= "number" and 
        type(element) ~= "string" and
-       (type(element.isInstanceOf) ~= "function" or not element.isInstanceOf(Alternatives)) and
-       (type(element.isInstanceOf) ~= "function" or not element.isInstanceOf(Repeat)) and
-       (type(element.isInstanceOf) ~= "function" or not element.isInstanceOf(Optional)) and
-       (type(element.isInstanceOf) ~= "function" or not element.isInstanceOf(Range))
+       not Alternatives.isInstanceOf(element, Alternatives) and
+       not Range.isInstanceOf(element, Range) and
+       not Char.isInstanceOf(element, Char)
     then
         error("invalid element specified at index " .. i, 2)
     end
