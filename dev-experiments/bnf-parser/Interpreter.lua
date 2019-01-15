@@ -30,18 +30,20 @@ function Interpreter:parse(input, start_rule_name)
     end
 
     local parse_state = {
+        input = input,
         input_position = 1
     }
 
-    return self:parse_sequence_group(input, start_rule, parse_state)
+    return self:parse_sequence_group(start_rule, parse_state)
     -- return parse tree
 end
 
-function Interpreter:parse_sequence_group(input, sequence_group, parse_state)
+function Interpreter:parse_sequence_group(sequence_group, parse_state)
     -- TODO: ERROR MESSAGES!
-    assert(type(input) == "string")
     assert(SequenceGroup.isInstanceOf(sequence_group, SequenceGroup))
     assert(type(parse_state) == "table")
+    assert(type(parse_state.input) == "string")
+    assert(type(parse_state.input_position) == "number")
 
     -- TODO: This isn't going to work if two rules begin with the same sequence
     -- E.g. rule1 = rule2 rule3
@@ -50,9 +52,15 @@ function Interpreter:parse_sequence_group(input, sequence_group, parse_state)
     -- What we need to do here is make sure the ENTIRE input matches, so we probably
     -- need to turn this around (instead of iterating over rules, iterate over the characters)
 
+    -- Nope, not gonna work: we're told here to check if input matches this rule, we can't
+    -- do anything about any other rule.
+    -- What we CAN do though is, again, what I already wanted to do before: we can try all
+    -- rules and check which matches _best_
+
     local matched_rule = false
 
     local new_parse_state = {
+        input = parse_state.input,
         input_position = parse_state.input_position
     }
 
@@ -61,7 +69,7 @@ function Interpreter:parse_sequence_group(input, sequence_group, parse_state)
             local seq_group = self.grammar:all_rules()[element]
             assert(type(seq_group) ~= "nil")
 
-            local res = self:parse_sequence_group(input, seq_group, new_parse_state)
+            local res = self:parse_sequence_group(seq_group, new_parse_state)
 
             if res == false then
                 matched_rule = false
@@ -73,7 +81,7 @@ function Interpreter:parse_sequence_group(input, sequence_group, parse_state)
             for _, alt in ipairs(element:alternatives()) do
                 assert(SequenceGroup.isInstanceOf(alt, SequenceGroup))
 
-                local res = self:parse_sequence_group(input, alt, new_parse_state)
+                local res = self:parse_sequence_group(alt, new_parse_state)
 
                 if res == true then
                     matched_rule = true
@@ -81,12 +89,11 @@ function Interpreter:parse_sequence_group(input, sequence_group, parse_state)
                 end
             end
 
-            if matched_alt == false then
-                matched_rule = false
+            if matched_rule == false then
                 break
             end
         else
-            local curr_input_char = utf8.char(utf8.codepoint(input, utf8.offset(input, new_parse_state.input_position)))
+            local curr_input_char = utf8.char(utf8.codepoint(input, utf8.offset(new_parse_state.input, new_parse_state.input_position)))
 
             -- We've reached the end of the input stream prematurely
             if type(curr_input_char) == "nil" then
