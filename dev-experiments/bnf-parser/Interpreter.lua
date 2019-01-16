@@ -7,14 +7,12 @@ local class = require "middleclass"
 Interpreter = class "Interpreter"
 
 local Grammar = Grammar or require "Grammar"
---local Range = require "Range"
---local Alternatives = require "Alternatives"
---local Optional = require "Optional"
---local Repeat = require "Repeat"
 local SequenceGroup = SequenceGroup or require "SequenceGroup"
 local Char = Char or require "Char"
 local Token = Token or require "Token"
 local Rule = Rule or require "Rule"
+local InputStream = InputStream or require "InputStream"
+local TokenStream = TokenStream or require "TokenStream"
 
 function Interpreter:initialize(grammar)
     if not Grammar.isInstanceOf(grammar, Grammar) then
@@ -35,26 +33,29 @@ function Interpreter:run(input, start_rule_name)
         error("start rule specified does not exist", 2)
     end
 
-    local parse_state = {
-        token_stream = self:lexer(input),
-        position = 1
-    }
+    local res = self:lexer(input)
 
-    if parse_state.token_stream == false then
-        return false -- needs moar error messages
+    if res == false then
+        return false -- lexer failed, no token tree, needs more error info
     end
 
-    return self:parser_match_rule(start_rule:all_elements(), parse_state)
+    local tok_stream = TokenStream(res)
+
+    local res, new_tok_stream = self:parser_match_rule(tok_stream, start_rule:all_elements())
+
+    if res == true then
+        tok_stream = new_tok_stream
+    end
+
+    return res
     -- TODO: return parse tree
 end
 
-function Interpreter:parser_match_rule(seq_group, parse_state)
+function Interpreter:parser_match_rule(tok_stream, seq_group)
     -- TODO: We need to keep track of line/column for error messages
     -- TODO: ERROR MESSAGES!
+    assert(TokenStream.isInstanceOf(tok_stream, TokenStream))
     assert(SequenceGroup.isInstanceOf(seq_group, SequenceGroup))
-    assert(type(parse_state) == "table")
-    assert(type(parse_state.token_stream) == "table")
-    assert(type(parse_state.position) == "number")
 
     -- TODO: This isn't going to work if two rules begin with the same sequence
     -- E.g. rule1 = rule2 rule3
@@ -78,10 +79,7 @@ function Interpreter:parser_match_rule(seq_group, parse_state)
 
     local matched = false
 
-    local new_parse_state = {
-        token_stream = parse_state.token_stream,
-        position = parse_state.position
-    }
+    local new_tok_stream = tok_stream:clone()
 
     for _, element in ipairs(seq_group:all_elements()) do
         if type(element) == "string" then
@@ -89,15 +87,15 @@ function Interpreter:parser_match_rule(seq_group, parse_state)
             assert(type(element_rule) ~= "nil", "non-existing rule '" .. element .. "' was referenced in another rule")
 
             if element_rule:all_attributes()["Token"] then
-                if element ~= new_parse_state.token_stream[new_parse_state.position]:of_rule() then
+                if element ~= new_tok_stream:curr():of_rule() then
                     matched = false -- this needs to be here, because it may be that the previous loop iteration set this to true
                     break
                 else
                     matched = true
-                    new_parse_state.position = new_parse_state.position + 1
+                    new_tok_stream:advance()
                 end
             else
-                local res = self:parser_match_rule(element_rule:all_elements(), new_parse_state)
+                local res, _new_tok_stream = self:parser_match_rule(new_tok_stream, element_rule:all_elements())
 
                 if res == false then
                     matched = false
@@ -105,15 +103,17 @@ function Interpreter:parser_match_rule(seq_group, parse_state)
                 end
 
                 matched = true
+                new_tok_stream = _new_tok_stream
             end
         elseif Alternatives.isInstanceOf(element, Alternatives) then
             for _, alt in ipairs(element:alternatives()) do
                 assert(SequenceGroup.isInstanceOf(alt, SequenceGroup))
 
-                local res = self:parser_match_rule(alt, new_parse_state)
+                local res, _new_tok_stream = self:parser_match_rule(new_tok_stream, alt)
 
                 if res == true then
                     matched = true
+                    new_tok_stream = _new_tok_stream
                     break
                 else
                     matched = false -- it could have previously been true
@@ -129,12 +129,12 @@ function Interpreter:parser_match_rule(seq_group, parse_state)
     end
 
     if matched == true then -- if we finished and matched is true, then the rule matches
-        parse_state.position = new_parse_state.position
-        return true
+        return true, new_tok_stream
     else
         return false
     end
 end
+
 --  TODO: Optionals & Repeat! both in lexer and parser (can be part of any rule)
 function Interpreter:lexer(input)
     local token_tree = {}
@@ -143,13 +143,17 @@ function Interpreter:lexer(input)
     -- Once all bugs are fixed, I go back to what I was doing: error handling, and then fixing the problem mentioned in parser_match_rule
     -- TODO: Doesn't the lexer need a best match too? They're still rules after all
 
-    -- For every UTF8 character
-    local lexer_state = {
-        input = input,
-        position = 1
-    }
+    -- WHAT ARE WE DOING RIGHT NOW?
+    -- Separation of responsabilities
+    -- We need an InputStream and a TokenStream, so we can keep track of line/column
+    -- so that we can do some simple error reporting on lexical errors
+    -- then we'll see what we can do about further error reporting
+    -- i.e. see above, or in parser_match_rule, or notepad file
 
-    while lexer_state.position <= utf8.len(input) do
+    -- For every UTF8 character
+    local inp_stream = InputStream(input)
+
+    while not inp_stream:eof() do
         local matched = false
 
         -- For every rule
@@ -157,11 +161,12 @@ function Interpreter:lexer(input)
             -- ...that is a token
             if rule:all_attributes()["Token"] then
                 -- Check if the sequence starting at lexer_state.position matches the rule
-                local success, token = self:lexer_match_rule(lexer_state, rule_name, rule:all_elements())
+                local success, token, new_inp_stream = self:lexer_match_rule(inp_stream, rule_name, rule:all_elements())
 
                 if success == true then
                     table.insert(token_tree, token)
                     matched = true
+                    inp_stream = new_inp_stream
                     break
                 end
             end
@@ -176,17 +181,14 @@ function Interpreter:lexer(input)
     return token_tree
 end
 
-function Interpreter:lexer_match_rule(lexer_state, rule_name, seq_group)
-    local new_lexer_state = {
-        input = lexer_state.input,
-        position = lexer_state.position
-    }
+function Interpreter:lexer_match_rule(inp_stream, rule_name, seq_group)
+    local inp_stream = inp_stream:clone()
 
     local matched = false
 
     -- Check every element in its sequence group
     for _, elem in ipairs(seq_group:all_elements()) do
-        local c = utf8.char(utf8.codepoint(new_lexer_state.input, utf8.offset(new_lexer_state.input, new_lexer_state.position)))
+        local c = inp_stream:curr()
 
         -- If it's a char, check if it matches the input character. If it doesn't, then this isn't the token
         if Char.isInstanceOf(elem, Char) then
@@ -197,7 +199,7 @@ function Interpreter:lexer_match_rule(lexer_state, rule_name, seq_group)
             end
 
             matched = true
-            new_lexer_state.position = new_lexer_state.position + 1
+            inp_stream:advance()
         -- If it's a range, check if it matches the input character. If it doesn't, then this isn't the token
         elseif Range.isInstanceOf(elem, Range) then
             local res = elem:try_match(c)
@@ -207,14 +209,15 @@ function Interpreter:lexer_match_rule(lexer_state, rule_name, seq_group)
             end
 
             matched = true
-            new_lexer_state.position = new_lexer_state.position + 1
+            inp_stream:advance()
         -- If it's an alternative, check if any alternative matches the input character. If it doesn't, then this isn't the token
         elseif Alternatives.isInstanceOf(elem, Alternatives) then
             for _, alt in ipairs(elem:alternatives()) do
-                local success, token = self:lexer_match_rule(rule_name, alt, new_lexer_state)
+                local success, token, new_inp_stream = self:lexer_match_rule(inp_stream, rule_name, alt)
 
                 if success == true then
                     matched = true
+                    inp_stream = new_inp_stream
                     break
                 end
             end
@@ -224,8 +227,7 @@ function Interpreter:lexer_match_rule(lexer_state, rule_name, seq_group)
     end
 
     if matched == true then
-        lexer_state.position = new_lexer_state.position
-        return true, Token(rule_name)
+        return true, Token(rule_name), inp_stream
     else
         return false
     end

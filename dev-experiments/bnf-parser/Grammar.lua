@@ -16,6 +16,7 @@ local Rule = Rule or require "Rule"
 -- Also need to make sure sequence groups of rules without token attributes don't have
 -- range, char, etc. which are token-only elements
 -- And tokens don't have repeats!
+-- Rules should be case insensitive!
 
 function Grammar:initialize()
     self.rules = {}
