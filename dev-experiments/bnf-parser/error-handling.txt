@@ -1,4 +1,4 @@
-- lexical errors (unrecognized character/sequence of characters; invalid sequence, i.e. recognized but doesn't follow rules)
+- lexical errors (unrecognized character/sequence of characters)
 - syntatical errors (input doesn't follow the rules of structure, etc.)
 - semantical errors (input has no meaning)
 

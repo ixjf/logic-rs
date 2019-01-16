@@ -15,6 +15,7 @@ local Token = Token or require "Token"
 local Rule = Rule or require "Rule"
 local InputStream = InputStream or require "InputStream"
 local TokenStream = TokenStream or require "TokenStream"
+local Error = Error or require "Error"
 
 function Interpreter:initialize(grammar)
     if not Grammar.isInstanceOf(grammar, Grammar) then
@@ -35,27 +36,27 @@ function Interpreter:run(input, start_rule_name)
         error("start rule specified does not exist", 2)
     end
 
-    local res = self:lexer(input)
+    local res, output = self:lexer(input)
 
     if res == false then
-        return false -- lexer failed, no token tree, needs more error info
+        return false, output
     end
 
-    local tok_stream = TokenStream(res)
+    local tok_stream = TokenStream(output)
 
-    local res, new_tok_stream, no_tokens_matched = self:parser_match_rule(tok_stream, start_rule:all_elements())
+    local a, b, c = self:parser_match_rule(tok_stream, start_rule:all_elements())
 
-    if res == true then
-        tok_stream = new_tok_stream
+    if a == true then
+        tok_stream = b
+        return true
+    else
+        return false, b
     end
 
-    return res
     -- TODO: return parse tree
 end
 
 function Interpreter:parser_match_rule(tok_stream, seq_group)
-    -- TODO: We need to keep track of line/column for error messages
-    -- TODO: ERROR MESSAGES!
     assert(TokenStream.isInstanceOf(tok_stream, TokenStream))
     assert(SequenceGroup.isInstanceOf(seq_group, SequenceGroup))
     
@@ -136,7 +137,9 @@ function Interpreter:parser_match_rule(tok_stream, seq_group)
     if matched == true then -- if we finished and matched is true, then the rule matches
         return true, new_tok_stream, no_tokens_matched
     else
-        return false, nil, no_tokens_matched
+        return false, 
+               Error(Error.Types.UnrecognizedExpr, new_tok_stream:current_line(), new_tok_stream:current_col()), 
+               no_tokens_matched
     end
 end
 
@@ -144,22 +147,11 @@ end
 function Interpreter:lexer(input)
     local token_tree = {}
 
-    -- Task list:
-    -- Once all bugs are fixed, I go back to what I was doing: error handling, and then fixing the problem mentioned in parser_match_rule
-    -- TODO: Doesn't the lexer need a best match too? They're still rules after all
-
-    -- WHAT ARE WE DOING RIGHT NOW?
-    -- Separation of responsabilities
-    -- We need an InputStream and a TokenStream, so we can keep track of line/column
-    -- so that we can do some simple error reporting on lexical errors
-    -- then we'll see what we can do about further error reporting
-    -- i.e. see above, or in parser_match_rule, or notepad file
-
     -- For every UTF8 character
     local inp_stream = InputStream(input)
 
     while not inp_stream:eof() do
-        local matched = false
+        local matches = {}
 
         -- For every rule
         for rule_name, rule in pairs(self.grammar:all_rules()) do
@@ -169,21 +161,23 @@ function Interpreter:lexer(input)
                 local success, token, new_inp_stream, no_chars_matched = self:lexer_match_rule(inp_stream, rule_name, rule:all_elements())
 
                 if success == true then
-                    table.insert(token_tree, token)
-                    matched = true
-                    inp_stream = new_inp_stream
-                    break
+                    table.insert(matches, {token = token, inp_stream = new_inp_stream, no_chars_matched = no_chars_matched})
                 end
             end
         end
 
-        -- No token matched this character/sequence of characters
-        if matched == false then
-            return false -- TODO: error messages
+        -- No tokens matched this character/sequence of characters
+        if #matches == 0 then
+            return false, Error(Error.Types.UnrecognizedToken, inp_stream:current_line(), inp_stream:current_col())
         end
+
+        table.sort(matches, function(a, b) return a.no_chars_matched > b.no_chars_matched end)
+
+        table.insert(token_tree, {token = matches[1].token, line = inp_stream:current_line(), col = inp_stream:current_col()})
+        inp_stream = matches[1].inp_stream
     end
 
-    return token_tree
+    return true, token_tree
 end
 
 function Interpreter:lexer_match_rule(inp_stream, rule_name, seq_group)
@@ -248,7 +242,7 @@ function Interpreter:lexer_match_rule(inp_stream, rule_name, seq_group)
     if matched == true then
         return true, Token(rule_name), inp_stream, no_chars_matched
     else
-        return false
+        return false, nil, nil, no_chars_matched
     end
 end
 

@@ -4,6 +4,7 @@ local SequenceGroup = SequenceGroup or require "../SequenceGroup"
 local Char = Char or require "../Char"
 local Alternatives = Alternatives or require "../Alternatives"
 local Attributes = Attributes or require "../Attributes"
+local Error = Error or require "../Error"
 
 function parses_valid_statement()
     local g = Grammar()
@@ -61,6 +62,35 @@ function chooses_best_match()
     -- However, before we have a parse tree, we can't actually test this
 end
 
+function can_provide_error_info()
+    local g = Grammar()
+        :add_rule("grouper-opening", SequenceGroup(Char("(")), Attributes(Attributes.Types.Token))
+        :add_rule("grouper-closing", SequenceGroup(Char(")")), Attributes(Attributes.Types.Token))
+        :add_rule("conjunction-connective", SequenceGroup(Char("&")), Attributes(Attributes.Types.Token))
+        :add_rule("disjunction-connective", SequenceGroup(Char(utf8.char(0x2228))), Attributes(Attributes.Types.Token))
+        :add_rule("negation-connective", SequenceGroup(Char("~")), Attributes(Attributes.Types.Token))
+        :add_rule("conditional-connective", SequenceGroup(Char(utf8.char(0x2283))), Attributes(Attributes.Types.Token))
+        :add_rule("simple-statement-letter", SequenceGroup(Range("A", "Z"), Range(utf8.char(0x2081), utf8.char(0x2089))), Attributes(Attributes.Types.Token))
+
+        :add_rule("logical-conjunction", SequenceGroup("grouper-opening", "statement", "conjunction-connective", "statement", "grouper-closing"))
+        :add_rule("statement", SequenceGroup(Alternatives(SequenceGroup("simple-statement"), SequenceGroup("complex-statement"))))
+        :add_rule("simple-statement", SequenceGroup("simple-statement-letter"))
+        :add_rule("complex-statement", SequenceGroup(Alternatives(SequenceGroup("logical-conjunction"), SequenceGroup("logical-disjunction"), SequenceGroup("logical-negation"), SequenceGroup("logical-conditional"))))
+        :add_rule("logical-disjunction", SequenceGroup("grouper-opening", "statement", "disjunction-connective", "statement", "grouper-closing"))
+        :add_rule("logical-negation", SequenceGroup("negation-connective", "statement"))
+        :add_rule("logical-conditional", SequenceGroup("grouper-opening", "statement", "conditional-connective", "statement", "grouper-closing"))
+
+    local i = Interpreter(g)
+    local res, err = i:run("A" .. utf8.char(0x2081) .. "&B" .. utf8.char(0x2082) .. ")", "statement")
+    assert(res == false, "parsed invalid logical conjunction statement")
+    assert(Error.isInstanceOf(err, Error), "parsed invalid logical conjunction statement")
+    assert(err:err_type() == Error.Types.UnrecognizedExpr, "run() returned invalid err type")
+    assert(err:err_line() == 1, "run() passed wrong error location info")
+    assert(err:err_col() == 3, "run() passed wrong error location info")
+end
+
 parses_valid_statement()
 understands_tokens_with_alternatives()
 chooses_best_match()
+-- Not working as expected, matches simple statement and everything else is ignored, rip
+--can_provide_error_info()

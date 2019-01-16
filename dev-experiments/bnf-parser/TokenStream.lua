@@ -9,7 +9,9 @@ function TokenStream:initialize(token_tree)
     assert(#token_tree > 0, "(internal error) token_tree is empty")
 
     for i, v in ipairs(token_tree) do
-        assert(Token.isInstanceOf(v, Token), "(internal error) token_tree contains invalid elements")
+        assert(type(v) == "table" and Token.isInstanceOf(v.token, Token), "(internal error) token_tree contains invalid elements")
+        assert(type(v.line) == "number", "(internal error) token_tree contains invalid elements")
+        assert(type(v.col) == "number", "(internal error) token_tree contains invalid elements")
     end
 
     self.token_tree = token_tree
@@ -21,7 +23,23 @@ function TokenStream:curr()
         return nil
     end
 
-    return self.token_tree[self.position]
+    return self.token_tree[self.position].token
+end
+
+function TokenStream:current_line()
+    if self:eof() then
+        return nil
+    end
+
+    return self.token_tree[self.position].line
+end
+
+function TokenStream:current_col()
+    if self:eof() then
+        return nil
+    end
+
+    return self.token_tree[self.position].col
 end
 
 function TokenStream:eof()
