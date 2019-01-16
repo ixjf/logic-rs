@@ -1,0 +1,27 @@
+- lexical errors (unrecognized character/sequence of characters; invalid sequence, i.e. recognized but doesn't follow rules)
+- syntatical errors (input doesn't follow the rules of structure, etc.)
+- semantical errors (input has no meaning)
+
+
+- semantical errors are handled AFTER parsing, so np
+
+- the problem with lexical errors can be solved in these ways:
+    1) - tokens are made individual rules, and these rules annotated with a token attribute
+       - if during the lexer phase, we find a character/sequence of characters that _isn't_ a rule with a token attribute, then we know it's a lexical error - unrecognized sequence
+       - invalid sequences could be assumed if there was a partial match?
+
+- the problem with syntatical errors can be solved in these ways:
+    1) again, a best match would solve this problem. whether it would be completely accurate is beyond me
+    2) the problem with not reading all the input could be solved as to work with reasonable syntatical error handling. instead of forcing a language to have an 'input' rule that states precisely what can and can not be part of the program, it can take an 'expr' main rule, which is anything that can be input into the interpreter, and then a semantic analyzer can take care of checking whether anything makes sense at all. basically, separating interpretation of whatever rules are valid. What I mean is this:
+
+Instead of:
+
+input = argument / statement-set
+
+input = expr = all rules that can be part of the language.
+
+the parser builds a syntax tree from there, and THEN the semantic analyzer checks if two rules can appear together
+so if something doesn't match a rule, we use best match
+and if something doesn't follow the semantics, we can provide better error info
+
+BUT, BUT - the grammar is supposed to describe the entire language! so I'd rather not go with this. Annotating rules, on the other hand, might work.

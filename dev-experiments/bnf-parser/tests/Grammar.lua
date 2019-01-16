@@ -21,10 +21,10 @@ function add_alternative_to_rule_works()
     g:add_alternative_to_rule("foo", SequenceGroup("bar"))
 
     local added_rule = g:all_rules()["foo"]
-    assert(type(added_rule:all_elements()) == "table" and #added_rule:all_elements() == 1, "rule has no elements")
-    assert(Alternatives.isInstanceOf(added_rule:all_elements()[1], Alternatives), "rule's only element is not an Alternatives")
+    assert(type(added_rule:all_elements():all_elements()) == "table" and #added_rule:all_elements():all_elements() == 1, "rule has no elements")
+    assert(Alternatives.isInstanceOf(added_rule:all_elements():all_elements()[1], Alternatives), "rule's only element is not an Alternatives")
     
-    local added_rule_alternatives = added_rule:all_elements()[1]:alternatives()
+    local added_rule_alternatives = added_rule:all_elements():all_elements()[1]:alternatives()
     assert(type(added_rule_alternatives) == "table", "Alternatives alternatives() doesn't return a table")
     assert(#added_rule_alternatives == 2, "rule doesn't have two alternatives")
     
@@ -47,10 +47,10 @@ function add_alternative_to_rule_adds_to_existing_alternatives()
 
     local added_rule = g:all_rules()["foo"]
 
-    assert(#added_rule:all_elements() == 1, "rule should have only one child - an Alternatives - but it doesn't")
-    assert(Alternatives.isInstanceOf(added_rule:all_elements()[1], Alternatives), "only child of rule isn't an Alternatives")
+    assert(#added_rule:all_elements():all_elements() == 1, "rule should have only one child - an Alternatives - but it doesn't")
+    assert(Alternatives.isInstanceOf(added_rule:all_elements():all_elements()[1], Alternatives), "only child of rule isn't an Alternatives")
 
-    local alternatives = added_rule:all_elements()[1]
+    local alternatives = added_rule:all_elements():all_elements()[1]
     assert(#alternatives:alternatives() == 4, "rule was specified with 4 alternatives but doesn't have that amount")
     assert(alternatives:alternatives()[1]:all_elements()[1] == "moo", "first alternative is not 'moo'")
     assert(alternatives:alternatives()[2]:all_elements()[1] == "bar", "first alternative is not 'bar'")
