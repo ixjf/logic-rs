@@ -45,5 +45,22 @@ function understands_tokens_with_alternatives()
     assert(not i:run("B", "rule2"), "succeeded on invalid input @ token alternatives")
 end
 
+function chooses_best_match()
+    local g1 = Grammar()
+        :add_rule("rule4", SequenceGroup(Char("B")), Attributes(Attributes.Types.Token))
+        :add_rule("rule5", SequenceGroup(Char("C")), Attributes(Attributes.Types.Token))
+        
+
+        :add_rule("rule1", SequenceGroup(Alternatives(SequenceGroup("rule2"), SequenceGroup("rule3"))))
+        :add_rule("rule2", SequenceGroup("rule4", "rule5"))
+        :add_rule("rule3", SequenceGroup("rule4"))
+
+    -- TODO! This will work by checking if interpreter whose grammar has rule2 defined 
+    -- both before and after (in separate grammars) rule3
+    -- still chooses rule2 over rule3
+    -- However, before we have a parse tree, we can't actually test this
+end
+
 parses_valid_statement()
 understands_tokens_with_alternatives()
+chooses_best_match()
