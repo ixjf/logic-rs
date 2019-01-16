@@ -1,0 +1,31 @@
+1) proper error reporting - probably should come in the grammar
+
+2) parse trees
+
+3) the ability to recognize when there is garbage after the main rule has been matched - rules have to match an EOI in order for the parser to know there should be no more input
+
+4) support for 'Repeat' and 'Optional' in grammar
+
+5) checks in Grammar for existence of specified rules
+
+6) other simple checks that are documented in Grammar.lua
+
+7) make use of the grammar to give the parser more information, instead of polluting the parser itself
+
+8) handling whitespace and other such characters to ignore
+
+
+
+Grammar:
+    - made of rules
+    - rules are sequence groups, which can refer to other rules
+    - rules can have attributes, like token attribute
+    - rules can have elements which are Alternatives, Char, Optional, Range, Repeat
+
+Interpreter:
+    - takes an input string into an InputStream
+    - passes it to the lexer, which will: check every rule that is a token and try to match the input to that rule; repeat until a rule matches; if no match found, fail, otherwise, continue reading until the end of the input stream
+    - the result of the lexer is a token tree, which is passed to the parser
+    - the parser takes a token tree and tries to match the start rule to the tree; if the rule references a token, check if it matches the token; if the rule references another rule (that isn't a token), try to match that rule; if the rule has an alternative, check if any alternative matches; if a non-alternative doesn't match, then the rule doesn't match and the parser fails; if an alternative fails, it tries all others, and then:
+    - the parser doesn't try to match the leftmost option, but rather it matches whichever rule matches the most tokens
+    - 
