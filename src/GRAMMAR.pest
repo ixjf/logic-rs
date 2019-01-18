@@ -41,8 +41,8 @@ complex_statement = {
     logical_negation | 
     logical_disjunction | 
     logical_conditional |
-    existential_quantifier_statement |
-    universal_quantifier_statement
+    existential_statement |
+    universal_statement
 }
 
 conjunction_connective = _{ "&" }
@@ -75,9 +75,7 @@ logical_conditional = {
     grouper_closing 
 }
 
-subscript_number = { 
-    !"\u{2080}" ~ ('\u{2081}'..'\u{2089}'+ ~ "\u{2080}"*)+ 
-}
+subscript_number = { !"\u{2080}" ~ ('\u{2081}'..'\u{2089}'+ ~ "\u{2080}"*)+ }
 simple_statement_letter = @{ ASCII_ALPHA_UPPER ~ subscript_number? }
 simple_statement = {
     simple_statement_letter | 
@@ -88,29 +86,32 @@ singular_term = @{
     (&(!('x'..'z')) ~ ASCII_ALPHA_LOWER) ~ 
     subscript_number? 
 }
+
 variable = @{ 'x'..'z' ~ subscript_number? }
+
 term = { singular_term | variable }
-relation_letter = @{ ASCII_ALPHA_UPPER ~ subscript_number? }
-relation = ${
-	relation_letter ~
-    superscript_number
-}
-unbound_relation = ${ 
-    relation ~ 
-    (singular_term* ~ variable ~ singular_term*)+ 
-}
-bound_relation = ${ relation ~ singular_term+ }
+
 superscript_number = @{ 
     !"\u{2070}" ~ (
         ("\u{00B9}" | '\u{00B2}'..'\u{00B3}' | '\u{2074}'..'\u{2079}')+ ~ 
         "\u{2070}"*
     )+ 
 }
+predicate_letter_inner = @{ ASCII_ALPHA_UPPER ~ subscript_number? }
+predicate_letter = ${
+	predicate_letter_inner ~
+    superscript_number
+}
 
-singular_statement = { bound_relation }
+singular_statement = ${ predicate_letter ~ singular_term+ }
 
 predicate = { compound_predicate | simple_predicate }
-simple_predicate = { unbound_relation }
+
+simple_predicate = ${ 
+    predicate_letter ~ 
+    (singular_term* ~ variable ~ singular_term*)+ 
+}
+
 conjunctive_predicate = { 
     grouper_opening ~ 
     predicate ~ 
@@ -144,14 +145,14 @@ compound_predicate = {
 }
 
 existential_quantifier = _{ "\u{2203}" }
-existential_quantifier_statement = { 
+existential_statement = { 
     existential_quantifier ~ 
     variable ~ 
     predicate 
 }
 
 universal_quantifier = _{ "\u{2200}" }
-universal_quantifier_statement = { 
+universal_statement = { 
     universal_quantifier ~ 
     variable ~ 
     predicate 
