@@ -6,6 +6,7 @@ impl PartialEq<String> for SimpleStatementLetter {
         self.0 == *rhs
     }
 }
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct SingularTerm(pub String);
 
@@ -14,6 +15,7 @@ impl PartialEq<String> for SingularTerm {
         self.0 == *rhs
     }
 }
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Variable(pub String);
 
@@ -22,6 +24,7 @@ impl PartialEq<String> for Variable {
         self.0 == *rhs
     }
 }
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Degree(pub usize);
 
@@ -30,6 +33,7 @@ impl PartialEq<usize> for Degree {
         self.0 == *rhs
     }
 }
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct PredicateLetter(pub String, pub Degree);
 

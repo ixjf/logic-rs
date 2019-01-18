@@ -1,10 +1,11 @@
 // TODO: Support for groupers, nested quantifiers!!! (can't have quantifier
-// with existing variable as well!)
+// with existing variable as well! and a quantifier statement's predicate
+// must necessarily have that variable bound in at least one place)
 
 // This specification does not take into account these:
-// 1. CHECK Degree of predicate matching number of terms
-// 2. CHECK Binding correct variable to predicate in quantifier
-// 3. Operator precedence
+// 1. Degree of predicate matching number of terms
+// 2. Binding correct variable to predicate in quantifier
+// 3. (not yet implemented at all) Operator precedence
 // For all else, if it doesn't match wiki/Language, it's
 // a bug
 
@@ -114,27 +115,34 @@ simple_predicate = ${
 
 conjunctive_predicate = { 
     grouper_opening ~ 
-    predicate ~ 
+    predicate ~
+    //(predicate | existential_statement | universal_statement) ~ 
     conjunction_connective ~ 
-    predicate ~ 
+    predicate ~
+    //(predicate | existential_statement | universal_statement) ~ 
     grouper_closing 
 }
 negative_predicate = {
     negation_connective ~ 
+    // (predicate | existential_statement | universal_statement)
     predicate
 }
 disjunctive_predicate = {
     grouper_opening ~ 
-    predicate ~ 
+    // (predicate | existential_statement | universal_statement) ~ 
+    predicate ~
     disjunction_connective ~ 
-    predicate ~ 
+    // (predicate | existential_statement | universal_statement) ~ 
+    predicate ~
     grouper_closing
 }
 conditional_predicate = {
     grouper_opening ~ 
-    predicate ~ 
+    // (predicate | existential_statement | universal_statement)~ 
+    predicate ~
     conditional_connective ~ 
-    predicate ~ 
+    // (predicate | existential_statement | universal_statement) ~ 
+    predicate ~
     grouper_closing
 }
 compound_predicate = { 
