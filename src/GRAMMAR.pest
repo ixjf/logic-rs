@@ -1,10 +1,10 @@
-// TODO: Support for groupers
+// TODO: Support for groupers, nested quantifiers!!! (can't have quantifier
+// with existing variable as well!)
 
 // This specification does not take into account these:
-// 1. Degree of predicate matching number of terms
-// 2. Valid unbound predicate in quantifier statement
-// 3. Binding correct variable to predicate in quantifier
-// 4. Operator precedence
+// 1. CHECK Degree of predicate matching number of terms
+// 2. CHECK Binding correct variable to predicate in quantifier
+// 3. Operator precedence
 // For all else, if it doesn't match wiki/Language, it's
 // a bug
 
@@ -99,6 +99,7 @@ unbound_relation = ${
     relation ~ 
     (singular_term* ~ variable ~ singular_term*)+ 
 }
+bound_relation = ${ relation ~ singular_term+ }
 superscript_number = @{ 
     !"\u{2070}" ~ (
         ("\u{00B9}" | '\u{00B2}'..'\u{00B3}' | '\u{2074}'..'\u{2079}')+ ~ 
@@ -106,7 +107,7 @@ superscript_number = @{
     )+ 
 }
 
-singular_statement = { relation ~ (!variable ~ singular_term+) }
+singular_statement = { bound_relation }
 
 predicate = { compound_predicate | simple_predicate }
 simple_predicate = { unbound_relation }

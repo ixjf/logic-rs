@@ -11,12 +11,12 @@ pub type SingularTerm = String;
 
 pub type Variable = String;
 
-pub type Degree = u64;
+pub type Degree = usize;
 
 pub type RelationLetter = String;
 
 #[derive(Debug)]
-pub struct Relation(RelationLetter, Degree);
+pub struct Relation(pub RelationLetter, pub Degree);
 
 #[derive(Debug)]
 pub enum Term {
@@ -173,13 +173,15 @@ fn parse_simple_statement(pair: Pair<Rule>) -> Statement {
         Rule::singular_statement => {
             let mut sng_st_inner = inner.into_inner();
 
-            let mut relation_inner = sng_st_inner.next().unwrap().into_inner();
+            let mut bound_relation = sng_st_inner.next().unwrap().into_inner();
+
+            let mut relation_inner = bound_relation.next().unwrap().into_inner();
 
             let relation_letter = relation_inner.next().unwrap().as_str().to_owned();
             let superscript_number =
                 superscript_to_number(relation_inner.next().unwrap().as_str().chars());
 
-            let terms = relation_inner.map(|x| x.as_str().to_owned()).collect(); // remaining children are terms
+            let terms = relation_inner.map(|x| x.as_str().to_owned()).collect(); // remaining children are singular terms
 
             Statement::SingularStatement(Relation(relation_letter, superscript_number), terms)
         }
@@ -267,7 +269,7 @@ fn parse_simple_predicate(pair: Pair<Rule>) -> Predicate {
     Predicate::SimplePredicate(Relation(relation_letter, superscript_number), terms)
 }
 
-fn superscript_to_number(iter: Chars) -> u64 {
+fn superscript_to_number(iter: Chars) -> usize {
     iter.map(|x| match x {
         '\u{2070}' => '0',
         '\u{00B9}' => '1',
@@ -282,6 +284,6 @@ fn superscript_to_number(iter: Chars) -> u64 {
         _ => unreachable!(),
     })
     .collect::<String>()
-    .parse::<u64>()
+    .parse()
     .unwrap()
 }
