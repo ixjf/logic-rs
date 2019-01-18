@@ -1,24 +1,24 @@
 #[derive(Debug, PartialEq, Eq)]
-pub struct SimpleStatementLetter(pub char);
+pub struct SimpleStatementLetter(pub String);
 
-impl PartialEq<char> for SimpleStatementLetter {
-    fn eq(&self, rhs: &char) -> bool {
+impl PartialEq<String> for SimpleStatementLetter {
+    fn eq(&self, rhs: &String) -> bool {
         self.0 == *rhs
     }
 }
 #[derive(Debug, PartialEq, Eq)]
-pub struct SingularTerm(pub char);
+pub struct SingularTerm(pub String);
 
-impl PartialEq<char> for SingularTerm {
-    fn eq(&self, rhs: &char) -> bool {
+impl PartialEq<String> for SingularTerm {
+    fn eq(&self, rhs: &String) -> bool {
         self.0 == *rhs
     }
 }
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Variable(pub char);
+pub struct Variable(pub String);
 
-impl PartialEq<char> for Variable {
-    fn eq(&self, rhs: &char) -> bool {
+impl PartialEq<String> for Variable {
+    fn eq(&self, rhs: &String) -> bool {
         self.0 == *rhs
     }
 }
@@ -31,7 +31,7 @@ impl PartialEq<usize> for Degree {
     }
 }
 #[derive(Debug, PartialEq, Eq)]
-pub struct PredicateLetter(pub char, pub Degree);
+pub struct PredicateLetter(pub String, pub Degree);
 
 #[derive(Debug)]
 pub enum ParseTree {
@@ -240,7 +240,7 @@ impl Parser {
 
         let mut inner = pair.into_inner();
 
-        let variable = Variable(inner.next().unwrap().as_str().chars().next().unwrap());
+        let variable = Variable(inner.next().unwrap().as_str().to_owned());
 
         let mut stack = Vec::new();
         stack.push(variable.clone());
@@ -254,7 +254,7 @@ impl Parser {
 
         let mut inner = pair.into_inner();
 
-        let variable = Variable(inner.next().unwrap().as_str().chars().next().unwrap());
+        let variable = Variable(inner.next().unwrap().as_str().to_owned());
 
         let mut stack = Vec::new();
         stack.push(variable.clone());
@@ -271,7 +271,7 @@ impl Parser {
         match inner.as_rule() {
             Rule::singular_statement => self.singular_statement_into_ast(inner),
             Rule::simple_statement_letter => Ok(Statement::Simple(SimpleStatementLetter(
-                inner.as_str().chars().next().unwrap(),
+                inner.as_str().to_owned(),
             ))),
             _ => unreachable!("should never reach here"),
         }
@@ -286,7 +286,7 @@ impl Parser {
 
         let terms = inner
             .map(|x| match x.as_rule() {
-                Rule::singular_term => SingularTerm(x.as_str().chars().next().unwrap()),
+                Rule::singular_term => SingularTerm(x.as_str().to_owned()),
                 _ => unreachable!("should never reach here"),
             })
             .collect::<Vec<SingularTerm>>();
@@ -306,7 +306,7 @@ impl Parser {
 
         let mut inner = pair.into_inner();
 
-        let predicate_letter_inner = inner.next().unwrap().as_str().chars().next().unwrap();
+        let predicate_letter_inner = inner.next().unwrap().as_str().to_owned();
 
         let superscript_number = Degree(
             inner
@@ -450,10 +450,8 @@ impl Parser {
 
         let terms = inner
             .map(|x| match x.as_rule() {
-                Rule::singular_term => {
-                    Term::SingularTerm(SingularTerm(x.as_str().chars().next().unwrap()))
-                }
-                Rule::variable => Term::Variable(Variable(x.as_str().chars().next().unwrap())),
+                Rule::singular_term => Term::SingularTerm(SingularTerm(x.as_str().to_owned())),
+                Rule::variable => Term::Variable(Variable(x.as_str().to_owned())),
                 _ => unreachable!("should never reach here"),
             })
             .collect::<Vec<Term>>();
@@ -503,10 +501,247 @@ impl Parser {
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn 
-}*/
+    fn custom_error_provides_correct_position_info() {
+        let e =
+            Error::new_from_custom_error(Span::new("Hello world!", 0, 4).unwrap(), "missing comma");
+        assert!(e.position.0 == 1 && e.position.1 == 1);
+    }
+
+    #[test]
+    fn parses_statement_set() {
+        let parser = Parser::new();
+
+        match parser.parse("{A, B, C, D, F, G}") {
+            Ok(parse_tree) => match parse_tree {
+                ParseTree::StatementSet(_) => {}
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        };
+    }
+
+    #[test]
+    fn parses_argument() {
+        let parser = Parser::new();
+
+        match parser.parse("A, B, C, D, F .:. G") {
+            Ok(parse_tree) => match parse_tree {
+                ParseTree::Argument(_, _) => {}
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn parses_logical_conjunction() {
+        let parser = Parser::new();
+
+        match parser.parse("{(A & B)}") {
+            Ok(parse_tree) => match parse_tree {
+                ParseTree::StatementSet(mut statements) => {
+                    assert!(statements.len() == 1);
+                    match statements.pop().unwrap() {
+                        Statement::LogicalConjunction(a, b) => match (*a, *b) {
+                            (Statement::Simple(_), Statement::Simple(_)) => {}
+                            _ => assert!(false),
+                        },
+                        _ => assert!(false),
+                    }
+                }
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn parses_logical_negation() {
+        let parser = Parser::new();
+
+        match parser.parse("{~A}") {
+            Ok(parse_tree) => match parse_tree {
+                ParseTree::StatementSet(mut statements) => {
+                    assert!(statements.len() == 1);
+                    match statements.pop().unwrap() {
+                        Statement::LogicalNegation(a) => match *a {
+                            Statement::Simple(_) => {}
+                            _ => assert!(false),
+                        },
+                        _ => assert!(false),
+                    }
+                }
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn parses_logical_disjunction() {
+        let parser = Parser::new();
+
+        match parser.parse("{(A ∨ B)}") {
+            Ok(parse_tree) => match parse_tree {
+                ParseTree::StatementSet(mut statements) => {
+                    assert!(statements.len() == 1);
+                    match statements.pop().unwrap() {
+                        Statement::LogicalDisjunction(a, b) => match (*a, *b) {
+                            (Statement::Simple(_), Statement::Simple(_)) => {}
+                            _ => assert!(false),
+                        },
+                        _ => assert!(false),
+                    }
+                }
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn parses_logical_conditional() {
+        let parser = Parser::new();
+
+        match parser.parse("{(A ⊃ B)}") {
+            Ok(parse_tree) => match parse_tree {
+                ParseTree::StatementSet(mut statements) => {
+                    assert!(statements.len() == 1);
+                    match statements.pop().unwrap() {
+                        Statement::LogicalConditional(a, b) => match (*a, *b) {
+                            (Statement::Simple(_), Statement::Simple(_)) => {}
+                            _ => assert!(false),
+                        },
+                        _ => assert!(false),
+                    }
+                }
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn parses_existential_statement() {
+        let parser = Parser::new();
+
+        match parser.parse("{∃z(A¹z & B¹z)}") {
+            Ok(parse_tree) => match parse_tree {
+                ParseTree::StatementSet(mut statements) => {
+                    assert!(statements.len() == 1);
+                    match statements.pop().unwrap() {
+                        Statement::Existential(a, b) => match (a, b) {
+                            (Variable(_), Predicate::Conjunctive(_, _)) => {}
+                            _ => assert!(false),
+                        },
+                        _ => assert!(false),
+                    }
+                }
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn understands_that_degree_means_number_of_terms() {
+        let parser = Parser::new();
+
+        match parser.parse("{∃zA¹zs}") {
+            Ok(_) => assert!(false),
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn keeps_track_of_variable_stack() {
+        let parser = Parser::new();
+
+        match parser.parse("{∃zA¹y}") {
+            Ok(_) => assert!(false),
+            _ => {}
+        }
+    }
+
+    #[test]
+    fn parses_universal_statement() {
+        let parser = Parser::new();
+
+        match parser.parse("{∀z(A¹z & B¹z)}") {
+            Ok(parse_tree) => match parse_tree {
+                ParseTree::StatementSet(mut statements) => {
+                    assert!(statements.len() == 1);
+                    match statements.pop().unwrap() {
+                        Statement::Universal(a, b) => match (a, b) {
+                            (Variable(_), Predicate::Conjunctive(_, _)) => {}
+                            _ => assert!(false),
+                        },
+                        _ => assert!(false),
+                    }
+                }
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn parses_simple_statement_with_subscript() {
+        let parser = Parser::new();
+
+        match parser.parse("{A₂}") {
+            Ok(parse_tree) => match parse_tree {
+                ParseTree::StatementSet(mut statements) => {
+                    assert!(statements.len() == 1);
+                    match statements.pop().unwrap() {
+                        Statement::Simple(st_letter) => {
+                            assert!(st_letter == "A₂".to_owned());
+                        }
+                        _ => assert!(false),
+                    }
+                }
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn parses_singular_statement() {
+        let parser = Parser::new();
+
+        match parser.parse("{A₂¹b}") {
+            Ok(parse_tree) => match parse_tree {
+                ParseTree::StatementSet(mut statements) => {
+                    assert!(statements.len() == 1);
+                    match statements.pop().unwrap() {
+                        Statement::Singular(predicate_letter, mut terms) => {
+                            assert!(predicate_letter.0 == "A₂".to_owned());
+                            assert!(predicate_letter.1 == 1);
+                            assert!(terms.len() == 1);
+                            assert!(terms.pop().unwrap() == "b".to_owned());
+                        }
+                        _ => assert!(false),
+                    }
+                }
+                _ => assert!(false),
+            },
+            _ => assert!(false),
+        }
+    }
+
+    #[test]
+    fn singular_statement_doesnt_allow_variables() {
+        let parser = Parser::new();
+
+        match parser.parse("{A₂¹x}") {
+            Ok(_) => assert!(false),
+            _ => {}
+        }
+    }
+}

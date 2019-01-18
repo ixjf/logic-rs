@@ -78,8 +78,8 @@ logical_conditional = {
 subscript_number = { !"\u{2080}" ~ ('\u{2081}'..'\u{2089}'+ ~ "\u{2080}"*)+ }
 simple_statement_letter = @{ ASCII_ALPHA_UPPER ~ subscript_number? }
 simple_statement = {
-    simple_statement_letter | 
-    singular_statement 
+    singular_statement |
+    simple_statement_letter
 }
 
 singular_term = @{ 
