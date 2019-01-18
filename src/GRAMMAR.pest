@@ -1,0 +1,157 @@
+// TODO: Support for groupers
+
+// This specification does not take into account these:
+// 1. Degree of predicate matching number of terms
+// 2. Valid unbound predicate in quantifier statement
+// 3. Binding correct variable to predicate in quantifier
+// 4. Operator precedence
+// For all else, if it doesn't match wiki/Language, it's
+// a bug
+
+WHITESPACE = _{ " " | NEWLINE | "\t" }
+
+input = { SOI ~ (statement_set | argument) ~ EOI }
+
+//grouper = { grouper_opening ~ formula ~ grouper_closing }
+grouper_opening = _{ "(" }
+grouper_closing = _{ ")" }
+
+statement_separator = _{ "," }
+
+statement_set_opening = _{ "{" }
+statement_set_closing = _{ "}" }
+statement_set = { 
+    statement_set_opening ~ 
+    statement ~ (statement_separator ~ statement)* ~ 
+    statement_set_closing 
+}
+
+conclusion_indicator = _{ ".:." }
+premise = { statement }
+conclusion = { statement }
+argument = {
+    premise ~ (statement_separator ~ premise)* ~
+    conclusion_indicator ~
+    conclusion
+}
+
+statement = { complex_statement | simple_statement }
+complex_statement = { 
+    logical_conjunction | 
+    logical_negation | 
+    logical_disjunction | 
+    logical_conditional |
+    existential_quantifier_statement |
+    universal_quantifier_statement
+}
+
+conjunction_connective = _{ "&" }
+logical_conjunction = { 
+    grouper_opening ~ 
+    statement ~ 
+    conjunction_connective ~ 
+    statement ~ 
+    grouper_closing 
+}
+
+negation_connective = _{ "~" }
+logical_negation = { negation_connective ~ statement }
+
+disjunction_connective = _{ "\u{2228}" }
+logical_disjunction = { 
+    grouper_opening ~ 
+    statement ~ 
+    disjunction_connective ~ 
+    statement ~ 
+    grouper_closing 
+}
+
+conditional_connective = _{ "\u{2283}" }
+logical_conditional = { 
+    grouper_opening ~ 
+    statement ~ 
+    conditional_connective ~ 
+    statement ~ 
+    grouper_closing 
+}
+
+subscript_number = { 
+    !"\u{2080}" ~ ('\u{2081}'..'\u{2089}'+ ~ "\u{2080}"*)+ 
+}
+simple_statement_letter = @{ ASCII_ALPHA_UPPER ~ subscript_number? }
+simple_statement = {
+    simple_statement_letter | 
+    singular_statement 
+}
+
+singular_term = @{ 
+    (&(!('x'..'z')) ~ ASCII_ALPHA_LOWER) ~ 
+    subscript_number? 
+}
+variable = @{ 'x'..'z' ~ subscript_number? }
+term = { singular_term | variable }
+relation_letter = @{ ASCII_ALPHA_UPPER ~ subscript_number? }
+relation = ${
+	relation_letter ~
+    superscript_number
+}
+unbound_relation = ${ 
+    relation ~ 
+    (singular_term* ~ variable ~ singular_term*)+ 
+}
+superscript_number = @{ 
+    !"\u{2070}" ~ (
+        ("\u{00B9}" | '\u{00B2}'..'\u{00B3}' | '\u{2074}'..'\u{2079}')+ ~ 
+        "\u{2070}"*
+    )+ 
+}
+
+singular_statement = { relation ~ (!variable ~ singular_term+) }
+
+predicate = { compound_predicate | simple_predicate }
+simple_predicate = { unbound_relation }
+conjunctive_predicate = { 
+    grouper_opening ~ 
+    predicate ~ 
+    conjunction_connective ~ 
+    predicate ~ 
+    grouper_closing 
+}
+negative_predicate = {
+    negation_connective ~ 
+    predicate
+}
+disjunctive_predicate = {
+    grouper_opening ~ 
+    predicate ~ 
+    disjunction_connective ~ 
+    predicate ~ 
+    grouper_closing
+}
+conditional_predicate = {
+    grouper_opening ~ 
+    predicate ~ 
+    conditional_connective ~ 
+    predicate ~ 
+    grouper_closing
+}
+compound_predicate = { 
+    conjunctive_predicate |
+    negative_predicate |
+    disjunctive_predicate |
+    conditional_predicate
+}
+
+existential_quantifier = _{ "\u{2203}" }
+existential_quantifier_statement = { 
+    existential_quantifier ~ 
+    variable ~ 
+    predicate 
+}
+
+universal_quantifier = _{ "\u{2200}" }
+universal_quantifier_statement = { 
+    universal_quantifier ~ 
+    variable ~ 
+    predicate 
+}
