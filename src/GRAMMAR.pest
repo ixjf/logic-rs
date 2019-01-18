@@ -99,7 +99,7 @@ superscript_number = @{
 }
 predicate_letter_inner = @{ ASCII_ALPHA_UPPER ~ subscript_number? }
 predicate_letter = ${
-	predicate_letter_inner ~
+    predicate_letter_inner ~
     superscript_number
 }
 

@@ -85,23 +85,8 @@ pub struct Error {
     pub position: (usize, usize),
 }
 
-pub struct Parser {}
-
-impl Parser {
-    pub fn new() -> Self {
-        Parser {}
-    }
-
-    pub fn parse<'a>(&self, input: &'a str) -> Result<ParseTree, Error> {
-        use pest::Parser;
-
-        match pest_parser::GeneratedParser::parse(Rule::input, input) {
-            Ok(p) => self.into_ast(p),
-            Err(e) => Err(self.from_parsing_error(e)),
-        }
-    }
-
-    fn from_custom_error(&self, span: Span, decorated_message: &str) -> Error {
+impl Error {
+    pub(in parser) fn new_from_custom_error(span: Span, decorated_message: &str) -> Self {
         let e: pest_error<Rule> = pest_error::new_from_span(
             pest_error_variant::CustomError {
                 message: decorated_message.to_owned(),
@@ -115,7 +100,7 @@ impl Parser {
         }
     }
 
-    fn from_parsing_error(&self, e: pest_error<Rule>) -> Error {
+    pub(in parser) fn new_from_parsing_error(e: pest_error<Rule>) -> Error {
         use pest::error::LineColLocation;
 
         let position = match e.line_col {
@@ -126,6 +111,23 @@ impl Parser {
         Error {
             position,
             decorated_message: format!("{}", e),
+        }
+    }
+}
+
+pub struct Parser {}
+
+impl Parser {
+    pub fn new() -> Self {
+        Parser {}
+    }
+
+    pub fn parse<'a>(&self, input: &'a str) -> Result<ParseTree, Error> {
+        use pest::Parser;
+
+        match pest_parser::GeneratedParser::parse(Rule::input, input) {
+            Ok(p) => self.into_ast(p),
+            Err(e) => Err(Error::new_from_parsing_error(e)),
         }
     }
 
@@ -290,7 +292,7 @@ impl Parser {
             .collect::<Vec<SingularTerm>>();
 
         if predicate_letter.1 != terms.len() {
-            return Err(self.from_custom_error(
+            return Err(Error::new_from_custom_error(
                 pair.as_span(),
                 "degree doesn't match number of terms specified",
             ));
@@ -457,7 +459,7 @@ impl Parser {
             .collect::<Vec<Term>>();
 
         if predicate_letter.1 != terms.len() {
-            return Err(self.from_custom_error(
+            return Err(Error::new_from_custom_error(
                 pair.as_span(),
                 "degree doesn't match number of terms specified",
             ));
@@ -467,7 +469,7 @@ impl Parser {
             Term::Variable(var) => stack.contains(var),
             _ => true,
         }) {
-            return Err(self.from_custom_error(
+            return Err(Error::new_from_custom_error(
                 pair.as_span(),
                 "predicate binds to variable that isn't in scope",
             ));
@@ -500,3 +502,11 @@ impl Parser {
         Ok(ParseTree::Argument(statements, conclusion))
     }
 }
+
+/*#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn 
+}*/
