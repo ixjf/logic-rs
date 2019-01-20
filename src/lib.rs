@@ -2,4 +2,7 @@ extern crate pest;
 #[macro_use]
 extern crate pest_derive;
 
-mod parser;
+extern crate rctree;
+
+pub mod parser;
+pub mod validation;

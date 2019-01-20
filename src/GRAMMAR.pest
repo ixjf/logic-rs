@@ -76,19 +76,23 @@ logical_conditional = {
     grouper_closing 
 }
 
-subscript_number = { !"\u{2080}" ~ ('\u{2081}'..'\u{2089}'+ ~ "\u{2080}"*)+ }
-simple_statement_letter = @{ ASCII_ALPHA_UPPER ~ subscript_number? }
+subscript_number = ${ !"\u{2080}" ~ ('\u{2081}'..'\u{2089}'+ ~ "\u{2080}"*)+ }
+// Hack because pest doesn't include built-in rules in the AST
+simple_statement_letter_alpha = { ASCII_ALPHA_UPPER }
+simple_statement_letter = ${ simple_statement_letter_alpha ~ subscript_number? }
 simple_statement = {
     singular_statement |
     simple_statement_letter
 }
 
-singular_term = @{ 
-    (&(!('x'..'z')) ~ ASCII_ALPHA_LOWER) ~ 
+singular_term_alpha = { (&(!('x'..'z')) ~ ASCII_ALPHA_LOWER) }
+singular_term = ${ 
+    singular_term_alpha ~ 
     subscript_number? 
 }
 
-variable = @{ 'x'..'z' ~ subscript_number? }
+variable_alpha = { 'x'..'z' }
+variable = ${ variable_alpha ~ subscript_number? }
 
 term = { singular_term | variable }
 
@@ -98,9 +102,10 @@ superscript_number = @{
         "\u{2070}"*
     )+ 
 }
-predicate_letter_inner = @{ ASCII_ALPHA_UPPER ~ subscript_number? }
+predicate_letter_alpha = { ASCII_ALPHA_UPPER }
 predicate_letter = ${
-    predicate_letter_inner ~
+    predicate_letter_alpha ~ 
+    subscript_number? ~
     superscript_number
 }
 

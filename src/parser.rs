@@ -1,55 +1,49 @@
-#[derive(Debug, PartialEq, Eq)]
-pub struct SimpleStatementLetter(pub String);
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Subscript(pub Option<u64>);
 
-impl PartialEq<String> for SimpleStatementLetter {
-    fn eq(&self, rhs: &String) -> bool {
-        self.0 == *rhs
+impl PartialEq<u64> for Subscript {
+    fn eq(&self, rhs: &u64) -> bool {
+        match self.0 {
+            Some(ref lhs) => lhs == rhs,
+            None => false,
+        }
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct SingularTerm(pub String);
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct SimpleStatementLetter(pub char, pub Subscript);
 
-impl PartialEq<String> for SingularTerm {
-    fn eq(&self, rhs: &String) -> bool {
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct SingularTerm(pub char, pub Subscript);
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Variable(pub char, pub Subscript);
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Degree(pub u64);
+
+impl PartialEq<u64> for Degree {
+    fn eq(&self, rhs: &u64) -> bool {
         self.0 == *rhs
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Variable(pub String);
+pub struct PredicateLetter(pub char, pub Subscript, pub Degree);
 
-impl PartialEq<String> for Variable {
-    fn eq(&self, rhs: &String) -> bool {
-        self.0 == *rhs
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct Degree(pub usize);
-
-impl PartialEq<usize> for Degree {
-    fn eq(&self, rhs: &usize) -> bool {
-        self.0 == *rhs
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub struct PredicateLetter(pub String, pub Degree);
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ParseTree {
     StatementSet(Vec<Statement>),
     Argument(Vec<Statement>, Statement),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Term {
     SingularTerm(SingularTerm),
     Variable(Variable),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Simple(SimpleStatementLetter),
     Singular(PredicateLetter, Vec<SingularTerm>),
@@ -61,7 +55,7 @@ pub enum Statement {
     Universal(Variable, Predicate),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Predicate {
     Simple(PredicateLetter, Vec<Term>),
     Conjunctive(Box<Predicate>, Box<Predicate>),
@@ -244,7 +238,7 @@ impl Parser {
 
         let mut inner = pair.into_inner();
 
-        let variable = Variable(inner.next().unwrap().as_str().to_owned());
+        let variable = self.variable_into_ast(inner.next().unwrap());
 
         let mut stack = Vec::new();
         stack.push(variable.clone());
@@ -258,7 +252,7 @@ impl Parser {
 
         let mut inner = pair.into_inner();
 
-        let variable = Variable(inner.next().unwrap().as_str().to_owned());
+        let variable = self.variable_into_ast(inner.next().unwrap());
 
         let mut stack = Vec::new();
         stack.push(variable.clone());
@@ -274,9 +268,17 @@ impl Parser {
 
         match inner.as_rule() {
             Rule::singular_statement => self.singular_statement_into_ast(inner),
-            Rule::simple_statement_letter => Ok(Statement::Simple(SimpleStatementLetter(
-                inner.as_str().to_owned(),
-            ))),
+            Rule::simple_statement_letter => {
+                let mut inner_inner = inner.into_inner();
+                let letter = inner_inner.next().unwrap().as_str().chars().next().unwrap();
+
+                let subscript = match inner_inner.peek() {
+                    Some(_) => self.subscript_into_ast(inner_inner.next().unwrap()),
+                    None => Subscript(None),
+                };
+
+                Ok(Statement::Simple(SimpleStatementLetter(letter, subscript)))
+            }
             _ => unreachable!("should never reach here"),
         }
     }
@@ -290,12 +292,12 @@ impl Parser {
 
         let terms = inner
             .map(|x| match x.as_rule() {
-                Rule::singular_term => SingularTerm(x.as_str().to_owned()),
+                Rule::singular_term => self.singular_term_into_ast(x),
                 _ => unreachable!("should never reach here"),
             })
             .collect::<Vec<SingularTerm>>();
 
-        if predicate_letter.1 != terms.len() {
+        if predicate_letter.2 != terms.len() as u64 {
             return Err(Error::new_from_custom_error(
                 pair.as_span(),
                 "degree doesn't match number of terms specified",
@@ -305,12 +307,32 @@ impl Parser {
         Ok(Statement::Singular(predicate_letter, terms))
     }
 
+    fn singular_term_into_ast(&self, pair: Pair<Rule>) -> SingularTerm {
+        assert!(pair.as_rule() == Rule::singular_term);
+
+        let mut inner = pair.into_inner();
+
+        let alpha = inner.next().unwrap().as_str().chars().next().unwrap();
+
+        let subscript = match inner.peek() {
+            Some(_) => self.subscript_into_ast(inner.next().unwrap()),
+            None => Subscript(None),
+        };
+
+        SingularTerm(alpha, subscript)
+    }
+
     fn predicate_letter_into_ast(&self, pair: Pair<Rule>) -> PredicateLetter {
         assert!(pair.as_rule() == Rule::predicate_letter);
 
         let mut inner = pair.into_inner();
 
-        let predicate_letter_inner = inner.next().unwrap().as_str().to_owned();
+        let predicate_letter_alpha = inner.next().unwrap().as_str().chars().next().unwrap();
+
+        let predicate_letter_subscript = match inner.peek().unwrap().as_rule() {
+            Rule::subscript_number => self.subscript_into_ast(inner.next().unwrap()),
+            _ => Subscript(None),
+        };
 
         let superscript_number = Degree(
             inner
@@ -336,7 +358,36 @@ impl Parser {
                 .unwrap(),
         );
 
-        PredicateLetter(predicate_letter_inner, superscript_number)
+        PredicateLetter(
+            predicate_letter_alpha,
+            predicate_letter_subscript,
+            superscript_number,
+        )
+    }
+
+    fn subscript_into_ast(&self, pair: Pair<Rule>) -> Subscript {
+        assert!(pair.as_rule() == Rule::subscript_number);
+
+        Subscript(Some(
+            pair.as_str()
+                .chars()
+                .map(|x| match x {
+                    '\u{2080}' => '0',
+                    '\u{2081}' => '1',
+                    '\u{2082}' => '2',
+                    '\u{2083}' => '3',
+                    '\u{2084}' => '4',
+                    '\u{2085}' => '5',
+                    '\u{2086}' => '6',
+                    '\u{2087}' => '7',
+                    '\u{2088}' => '8',
+                    '\u{2089}' => '9',
+                    _ => unreachable!("should never reach here"),
+                })
+                .collect::<String>()
+                .parse::<u64>()
+                .unwrap(),
+        ))
     }
 
     fn predicate_into_ast(
@@ -454,13 +505,13 @@ impl Parser {
 
         let terms = inner
             .map(|x| match x.as_rule() {
-                Rule::singular_term => Term::SingularTerm(SingularTerm(x.as_str().to_owned())),
-                Rule::variable => Term::Variable(Variable(x.as_str().to_owned())),
+                Rule::singular_term => Term::SingularTerm(self.singular_term_into_ast(x)),
+                Rule::variable => Term::Variable(self.variable_into_ast(x)),
                 _ => unreachable!("should never reach here"),
             })
             .collect::<Vec<Term>>();
 
-        if predicate_letter.1 != terms.len() {
+        if predicate_letter.2 != terms.len() as u64 {
             return Err(Error::new_from_custom_error(
                 pair.as_span(),
                 "degree doesn't match number of terms specified",
@@ -478,6 +529,21 @@ impl Parser {
         }
 
         Ok(Predicate::Simple(predicate_letter, terms))
+    }
+
+    fn variable_into_ast(&self, pair: Pair<Rule>) -> Variable {
+        assert!(pair.as_rule() == Rule::variable);
+
+        let mut inner = pair.into_inner();
+
+        let alpha = inner.next().unwrap().as_str().chars().next().unwrap();
+
+        let subscript = match inner.peek() {
+            Some(_) => self.subscript_into_ast(inner.next().unwrap()),
+            None => Subscript(None),
+        };
+
+        Variable(alpha, subscript)
     }
 
     fn argument_into_ast(&self, pair: Pair<Rule>) -> Result<ParseTree, Error> {
@@ -640,7 +706,7 @@ mod tests {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::Existential(a, b) => match (a, b) {
-                            (Variable(_), Predicate::Conjunctive(_, _)) => {}
+                            (Variable(_, _), Predicate::Conjunctive(_, _)) => {}
                             _ => assert!(false),
                         },
                         _ => assert!(false),
@@ -682,7 +748,7 @@ mod tests {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::Universal(a, b) => match (a, b) {
-                            (Variable(_), Predicate::Conjunctive(_, _)) => {}
+                            (Variable(_, _), Predicate::Conjunctive(_, _)) => {}
                             _ => assert!(false),
                         },
                         _ => assert!(false),
@@ -704,7 +770,8 @@ mod tests {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::Simple(st_letter) => {
-                            assert!(st_letter == "A₂".to_owned());
+                            assert!(st_letter.0 == 'A');
+                            assert!(st_letter.1 == Subscript(Some(2)));
                         }
                         _ => assert!(false),
                     }
@@ -725,10 +792,11 @@ mod tests {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::Singular(predicate_letter, mut terms) => {
-                            assert!(predicate_letter.0 == "A₂".to_owned());
-                            assert!(predicate_letter.1 == 1);
+                            assert!(predicate_letter.0 == 'A');
+                            assert!(predicate_letter.1 == 2);
+                            assert!(predicate_letter.2 == 1);
                             assert!(terms.len() == 1);
-                            assert!(terms.pop().unwrap() == "b".to_owned());
+                            assert!(terms.pop().unwrap() == SingularTerm('b', Subscript(None)));
                         }
                         _ => assert!(false),
                     }

@@ -6,3 +6,4 @@ authors = ["Pedro Fanha <ixjf@outlook.com>"]
 [dependencies]
 pest = "2.0"
 pest_derive = "2.0"
+rctree = "0.2"
