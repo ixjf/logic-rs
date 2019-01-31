@@ -83,7 +83,6 @@ struct TreeNode {
 
 pub struct TruthTreeMethod {
     tree: StatementTree<TreeNode>,
-    queue: BinaryHeap<QueueNode>,
 }
 
 impl TruthTreeMethod {
@@ -98,11 +97,12 @@ impl TruthTreeMethod {
                     })
                     .collect(),
             )),
-            queue: BinaryHeap::new(),
         }
     }
 
     pub fn compute(&mut self) {
+        let mut queue = BinaryHeap::new();
+
         // Populate the queue with the main trunk
         let main_trunk_id = self.tree.main_trunk();
 
@@ -116,7 +116,7 @@ impl TruthTreeMethod {
                     .clone();
                 let rule = self.matches_some_rule(&statement);
 
-                self.queue.push(QueueNode {
+                queue.push(QueueNode {
                     statement_id: statement_id.clone(),
                     statement,
                     rule,
@@ -132,7 +132,7 @@ impl TruthTreeMethod {
             statement,
             rule,
             branch_id,
-        }) = self.queue.pop()
+        }) = queue.pop()
         {
             if self
                 .tree
@@ -147,17 +147,11 @@ impl TruthTreeMethod {
                 return;
             }
 
-            // TODO: Because the queue is ordered, this won't be checked right when a contradiction appears
-            // Fix this without duplicating code
-            if self.statement_is_contradiction(&statement, &branch_id) {
-                self.tree.branch_from_id_mut(&branch_id).close();
-                continue;
-            }
-
             match rule {
                 Some(rule) => {
                     let result = self.apply_rule(rule.clone(), &statement);
 
+                    // Open child branches of branch where original statement is
                     let open_branches_ids = self
                         .tree
                         .branch_id_iter(&branch_id)
@@ -168,16 +162,32 @@ impl TruthTreeMethod {
                         .collect::<Vec<_>>();
 
                     for child_branch_id in open_branches_ids {
-                        match result.whatdo {
-                            DerivedRuleWhatdo::AddToExistingBranches => {
-                                // Add derived statements to all open branches at the end of the tree
-                                // (i.e. branches that have no children)
+                        for x in &result.statements {
+                            let (derived_statement_id, derived_statement_branch_id) = {
+                                match result.whatdo {
+                                    DerivedRuleWhatdo::AddToExistingBranches => {
+                                        // Add derived statement to all open child branches of branch_id
+                                        // at the end of the tree (i.e. child branches that have no children)
+                                        let new_statement_id = self
+                                            .tree
+                                            .branch_from_id_mut(&child_branch_id)
+                                            .append(TreeNode {
+                                                statement: x.clone(),
+                                                derived_from: Some((
+                                                    TreeNodeLocation(
+                                                        statement_id.clone(),
+                                                        branch_id.clone(),
+                                                    ),
+                                                    rule.clone(),
+                                                )),
+                                            });
 
-                                result.statements.iter().for_each(|x| {
-                                    let new_statement_id = self
-                                        .tree
-                                        .branch_from_id_mut(&child_branch_id)
-                                        .append(TreeNode {
+                                        (new_statement_id, child_branch_id.clone())
+                                    }
+                                    DerivedRuleWhatdo::AsNewBranches => {
+                                        // Each derived statement will create a new child branch on every open
+                                        // branch of branch_id that is at the end of the tree
+                                        let new_branch = Branch::new(vec![TreeNode {
                                             statement: x.clone(),
                                             derived_from: Some((
                                                 TreeNodeLocation(
@@ -186,49 +196,36 @@ impl TruthTreeMethod {
                                                 ),
                                                 rule.clone(),
                                             )),
-                                        });
+                                        }]);
 
-                                    // Add derived statement to queue for further processing
-                                    let new_node = QueueNode {
-                                        statement_id: new_statement_id.clone(),
-                                        statement: x.clone(),
-                                        rule: self.matches_some_rule(&x),
-                                        branch_id: child_branch_id.clone(),
-                                    };
-                                    self.queue.push(new_node);
-                                });
-                            }
-                            DerivedRuleWhatdo::AsNewBranches => {
-                                // Each derived statement will be a new child branch on every open
-                                // branch that is at the end of the tree
-                                result.statements.iter().for_each(|x| {
-                                    let new_branch = Branch::new(vec![TreeNode {
-                                        statement: x.clone(),
-                                        derived_from: Some((
-                                            TreeNodeLocation(
-                                                statement_id.clone(),
-                                                branch_id.clone(),
-                                            ),
-                                            rule.clone(),
-                                        )),
-                                    }]);
+                                        let root_statement_id =
+                                            new_branch.statement_id_iter().next().unwrap();
 
-                                    let root_statement_id =
-                                        new_branch.statement_id_iter().next().unwrap();
+                                        let new_branch_id =
+                                            self.tree.append_branch(new_branch, &child_branch_id);
 
-                                    let new_branch_id =
-                                        self.tree.append_branch(new_branch, &child_branch_id);
+                                        (root_statement_id, new_branch_id.clone())
+                                    }
+                                }
+                            };
 
-                                    // Add derived statement to queue for further processing
-                                    let new_node = QueueNode {
-                                        statement_id: root_statement_id,
-                                        statement: x.clone(),
-                                        rule: self.matches_some_rule(&x),
-                                        branch_id: new_branch_id,
-                                    };
+                            // Add derived statement to queue for further processing
+                            let new_node = QueueNode {
+                                statement_id: derived_statement_id,
+                                statement: x.clone(),
+                                rule: self.matches_some_rule(&x),
+                                branch_id: derived_statement_branch_id.clone(),
+                            };
+                            queue.push(new_node);
 
-                                    self.queue.push(new_node);
-                                });
+                            // If the statement contradicts another in child_branch_id or
+                            // any of its parents, keep the statement in the branch
+                            // but close it and move on to the next one
+                            if self.statement_is_contradiction(&x, &derived_statement_branch_id) {
+                                self.tree
+                                    .branch_from_id_mut(&derived_statement_branch_id)
+                                    .close();
+                                break;
                             }
                         }
                     }
@@ -527,7 +524,6 @@ mod tests {
         assert_eq!(queue.pop().unwrap().rule, Some(Rule::Disjunction));
     }
 
-    /*
     #[test]
     fn truth_tree_method_works_more_or_less() {
         let mut algo = TruthTreeMethod::new(&vec![
@@ -574,5 +570,5 @@ mod tests {
                 println!("  - Derived from: {:#?}", node.derived_from.clone());
             }
         }
-    }*/
+    }
 }
