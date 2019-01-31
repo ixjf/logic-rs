@@ -1,17 +1,20 @@
 use super::statement_tree::*;
-use crate::parser::{SimpleStatementLetter, Statement, Subscript}; // FIXME
+use crate::parser::{Predicate, SingularTerm, Statement, Subscript, Term, Variable};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
-enum Rule {
-    Conditional,
-    NegationOfConjunction,
-    Disjunction,
+pub enum Rule {
+    QuantifierExchange,
+    ExistentialQuantifier,
+    UniversalQuantifier,
     DoubleNegation,
     Conjunction,
     NegationOfConditional,
     NegationOfDisjunction,
+    Conditional,
+    NegationOfConjunction,
+    Disjunction,
 }
 
 #[derive(PartialEq, Eq)]
@@ -25,7 +28,10 @@ struct QueueNode {
 impl Ord for QueueNode {
     fn cmp(&self, other: &QueueNode) -> Ordering {
         // Priority order, top should come first, bottom last
-        let rule_priority_order: [Rule; 7] = [
+        let rule_priority_order: [Rule; 10] = [
+            Rule::QuantifierExchange,
+            Rule::ExistentialQuantifier,
+            Rule::UniversalQuantifier,
             Rule::DoubleNegation,
             Rule::Conjunction,
             Rule::NegationOfConditional,
@@ -73,10 +79,10 @@ struct RuleDeriveResult {
 }
 
 #[derive(Clone, Debug)]
-struct TreeNodeLocation(Id, Id); // Statement ID, Branch ID
+pub struct TreeNodeLocation(Id, Id); // Statement ID, Branch ID
 
 #[derive(Clone, Debug)]
-struct TreeNode {
+pub struct TreeNode {
     statement: Statement,
     derived_from: Option<(TreeNodeLocation, Rule)>,
 }
@@ -100,7 +106,7 @@ impl TruthTreeMethod {
         }
     }
 
-    pub fn compute(&mut self) {
+    pub fn compute(mut self) -> StatementTree<TreeNode> {
         let mut queue = BinaryHeap::new();
 
         // Populate the queue with the main trunk
@@ -144,12 +150,12 @@ impl TruthTreeMethod {
                 == 0
             {
                 // There are no open branches in the entire tree, stop
-                return;
+                break;
             }
 
             match rule {
                 Some(rule) => {
-                    let result = self.apply_rule(rule.clone(), &statement);
+                    let result = self.apply_rule(rule.clone(), &statement, &branch_id);
 
                     // Open child branches of branch where original statement is
                     let open_branches_ids = self
@@ -237,6 +243,8 @@ impl TruthTreeMethod {
             // The algorithm doesn't need it, and you can know which are 'done'
             // by checking the IDs that statements derive from
         }
+
+        self.tree
     }
 
     fn statement_is_contradiction(&self, statement: &Statement, branch_id: &Id) -> bool {
@@ -273,12 +281,12 @@ impl TruthTreeMethod {
     }
 
     fn matches_some_rule(&self, statement: &Statement) -> Option<Rule> {
-        if self.can_apply_conditional_rule(&statement) {
-            Some(Rule::Conditional)
-        } else if self.can_apply_negation_of_conjunction_rule(&statement) {
-            Some(Rule::NegationOfConjunction)
-        } else if self.can_apply_disjunction_rule(&statement) {
-            Some(Rule::Disjunction)
+        if self.can_apply_qe_rule(&statement) {
+            Some(Rule::QuantifierExchange)
+        } else if self.can_apply_eq_rule(&statement) {
+            Some(Rule::ExistentialQuantifier)
+        } else if self.can_apply_uq_rule(&statement) {
+            Some(Rule::UniversalQuantifier)
         } else if self.can_apply_double_negation_rule(&statement) {
             Some(Rule::DoubleNegation)
         } else if self.can_apply_conjunction_rule(&statement) {
@@ -287,31 +295,37 @@ impl TruthTreeMethod {
             Some(Rule::NegationOfConditional)
         } else if self.can_apply_negation_of_disjunction_rule(&statement) {
             Some(Rule::NegationOfDisjunction)
+        } else if self.can_apply_conditional_rule(&statement) {
+            Some(Rule::Conditional)
+        } else if self.can_apply_negation_of_conjunction_rule(&statement) {
+            Some(Rule::NegationOfConjunction)
+        } else if self.can_apply_disjunction_rule(&statement) {
+            Some(Rule::Disjunction)
         } else {
             None
         }
     }
 
-    fn can_apply_conditional_rule(&self, statement: &Statement) -> bool {
-        match statement {
-            Statement::LogicalConditional(_, _) => true,
-            _ => false,
-        }
-    }
-
-    fn can_apply_negation_of_conjunction_rule(&self, statement: &Statement) -> bool {
+    fn can_apply_qe_rule(&self, statement: &Statement) -> bool {
         match statement {
             Statement::LogicalNegation(ref rst) => match **rst {
-                Statement::LogicalConjunction(_, _) => true,
+                Statement::Existential(_, _) | Statement::Universal(_, _) => true,
                 _ => false,
             },
             _ => false,
         }
     }
 
-    fn can_apply_disjunction_rule(&self, statement: &Statement) -> bool {
+    fn can_apply_eq_rule(&self, statement: &Statement) -> bool {
         match statement {
-            Statement::LogicalDisjunction(_, _) => true,
+            Statement::Existential(_, _) => true,
+            _ => false,
+        }
+    }
+
+    fn can_apply_uq_rule(&self, statement: &Statement) -> bool {
+        match statement {
+            Statement::Universal(_, _) => true,
             _ => false,
         }
     }
@@ -353,37 +367,61 @@ impl TruthTreeMethod {
         }
     }
 
-    fn apply_rule(&self, rule: Rule, statement: &Statement) -> RuleDeriveResult {
+    fn can_apply_conditional_rule(&self, statement: &Statement) -> bool {
+        match statement {
+            Statement::LogicalConditional(_, _) => true,
+            _ => false,
+        }
+    }
+
+    fn can_apply_negation_of_conjunction_rule(&self, statement: &Statement) -> bool {
+        match statement {
+            Statement::LogicalNegation(ref rst) => match **rst {
+                Statement::LogicalConjunction(_, _) => true,
+                _ => false,
+            },
+            _ => false,
+        }
+    }
+
+    fn can_apply_disjunction_rule(&self, statement: &Statement) -> bool {
+        match statement {
+            Statement::LogicalDisjunction(_, _) => true,
+            _ => false,
+        }
+    }
+
+    fn apply_rule(&self, rule: Rule, statement: &Statement, branch_id: &Id) -> RuleDeriveResult {
         match rule {
-            Rule::Conditional => self.apply_conditional_rule(&statement),
-            Rule::NegationOfConjunction => self.apply_negation_of_conjunction_rule(&statement),
-            Rule::Disjunction => self.apply_disjunction_rule(&statement),
+            Rule::QuantifierExchange => self.apply_qe_rule(&statement),
+            Rule::ExistentialQuantifier => self.apply_eq_rule(&statement, &branch_id),
+            Rule::UniversalQuantifier => self.apply_uq_rule(&statement, &branch_id),
             Rule::DoubleNegation => self.apply_double_negation_rule(&statement),
             Rule::Conjunction => self.apply_conjunction_rule(&statement),
             Rule::NegationOfConditional => self.apply_negation_of_conditional_rule(&statement),
             Rule::NegationOfDisjunction => self.apply_negation_of_disjunction_rule(&statement),
+            Rule::Conditional => self.apply_conditional_rule(&statement),
+            Rule::NegationOfConjunction => self.apply_negation_of_conjunction_rule(&statement),
+            Rule::Disjunction => self.apply_disjunction_rule(&statement),
         }
     }
 
-    fn apply_conditional_rule(&self, statement: &Statement) -> RuleDeriveResult {
-        match statement {
-            Statement::LogicalConditional(ref lst, ref rst) => RuleDeriveResult {
-                statements: vec![Statement::LogicalNegation(lst.clone()), *rst.clone()],
-                whatdo: DerivedRuleWhatdo::AsNewBranches,
-            },
-            _ => panic!("attempt to apply wrong rule to statement"),
-        }
-    }
-
-    fn apply_negation_of_conjunction_rule(&self, statement: &Statement) -> RuleDeriveResult {
+    fn apply_qe_rule(&self, statement: &Statement) -> RuleDeriveResult {
         match statement {
             Statement::LogicalNegation(ref rst) => match **rst {
-                Statement::LogicalConjunction(ref inner_lst, ref inner_rst) => RuleDeriveResult {
-                    statements: vec![
-                        Statement::LogicalNegation(inner_lst.clone()),
-                        Statement::LogicalNegation(inner_rst.clone()),
-                    ],
-                    whatdo: DerivedRuleWhatdo::AsNewBranches,
+                Statement::Existential(ref var, ref pred) => RuleDeriveResult {
+                    statements: vec![Statement::Universal(
+                        var.clone(),
+                        Predicate::Negative(Box::new(pred.clone())),
+                    )],
+                    whatdo: DerivedRuleWhatdo::AddToExistingBranches,
+                },
+                Statement::Universal(ref var, ref pred) => RuleDeriveResult {
+                    statements: vec![Statement::Existential(
+                        var.clone(),
+                        Predicate::Negative(Box::new(pred.clone())),
+                    )],
+                    whatdo: DerivedRuleWhatdo::AddToExistingBranches,
                 },
                 _ => panic!("attempt to apply wrong rule to statement"),
             },
@@ -391,12 +429,69 @@ impl TruthTreeMethod {
         }
     }
 
-    fn apply_disjunction_rule(&self, statement: &Statement) -> RuleDeriveResult {
+    fn apply_eq_rule(&self, statement: &Statement, branch_id: &Id) -> RuleDeriveResult {
         match statement {
-            Statement::LogicalDisjunction(ref lst, ref rst) => RuleDeriveResult {
-                statements: vec![*lst.clone(), *rst.clone()],
-                whatdo: DerivedRuleWhatdo::AsNewBranches,
+            Statement::Existential(ref var, ref pred) => RuleDeriveResult {
+                statements: vec![self.instantiate_quantified_statement(
+                    &pred,
+                    &var,
+                    &self.first_unused_in_singular_term_stack(
+                        &self.build_singular_term_stack_for_branch(&branch_id),
+                    ),
+                )],
+                whatdo: DerivedRuleWhatdo::AddToExistingBranches,
             },
+            _ => panic!("attempt to apply wrong rule to statement"),
+        }
+    }
+
+    fn apply_uq_rule(&self, statement: &Statement, branch_id: &Id) -> RuleDeriveResult {
+        match statement {
+            Statement::Universal(ref var, ref pred) => {
+                // Build a list of all singular terms which we haven't instantiated
+                // this universal statement to yet
+                //
+                // If there are no singular terms in this branch at all,
+                // pick a random one
+                let stack = self.build_singular_term_stack_for_branch(&branch_id);
+
+                let new_singular_terms = if stack.is_empty() {
+                    vec![self.first_unused_in_singular_term_stack(&stack)]
+                } else {
+                    stack
+                        .iter()
+                        .cloned()
+                        .filter(|x| {
+                            let instantiated_statement =
+                                self.instantiate_quantified_statement(&pred, &var, &x);
+
+                            for ancestor_branch_id in self.tree.reverse_branch_id_iter(&branch_id) {
+                                let ancestor_branch = self.tree.branch_from_id(&ancestor_branch_id);
+
+                                for statement_id in ancestor_branch.statement_id_iter() {
+                                    if instantiated_statement
+                                        == ancestor_branch
+                                            .statement_from_id(&statement_id)
+                                            .statement
+                                    {
+                                        return false;
+                                    }
+                                }
+                            }
+
+                            true
+                        })
+                        .collect::<Vec<_>>()
+                };
+
+                RuleDeriveResult {
+                    statements: new_singular_terms
+                        .iter()
+                        .map(|x| self.instantiate_quantified_statement(&pred, &var, &x))
+                        .collect(),
+                    whatdo: DerivedRuleWhatdo::AddToExistingBranches,
+                }
+            }
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
@@ -452,11 +547,196 @@ impl TruthTreeMethod {
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
+
+    fn apply_conditional_rule(&self, statement: &Statement) -> RuleDeriveResult {
+        match statement {
+            Statement::LogicalConditional(ref lst, ref rst) => RuleDeriveResult {
+                statements: vec![Statement::LogicalNegation(lst.clone()), *rst.clone()],
+                whatdo: DerivedRuleWhatdo::AsNewBranches,
+            },
+            _ => panic!("attempt to apply wrong rule to statement"),
+        }
+    }
+
+    fn apply_negation_of_conjunction_rule(&self, statement: &Statement) -> RuleDeriveResult {
+        match statement {
+            Statement::LogicalNegation(ref rst) => match **rst {
+                Statement::LogicalConjunction(ref inner_lst, ref inner_rst) => RuleDeriveResult {
+                    statements: vec![
+                        Statement::LogicalNegation(inner_lst.clone()),
+                        Statement::LogicalNegation(inner_rst.clone()),
+                    ],
+                    whatdo: DerivedRuleWhatdo::AsNewBranches,
+                },
+                _ => panic!("attempt to apply wrong rule to statement"),
+            },
+            _ => panic!("attempt to apply wrong rule to statement"),
+        }
+    }
+
+    fn apply_disjunction_rule(&self, statement: &Statement) -> RuleDeriveResult {
+        match statement {
+            Statement::LogicalDisjunction(ref lst, ref rst) => RuleDeriveResult {
+                statements: vec![*lst.clone(), *rst.clone()],
+                whatdo: DerivedRuleWhatdo::AsNewBranches,
+            },
+            _ => panic!("attempt to apply wrong rule to statement"),
+        }
+    }
+
+    fn build_singular_term_stack_for_branch(&self, branch_id: &Id) -> Vec<SingularTerm> {
+        let mut stack = Vec::new();
+
+        for ancestor_branch_id in self.tree.reverse_branch_id_iter(&branch_id) {
+            let ancestor_branch = self.tree.branch_from_id(&ancestor_branch_id);
+
+            for statement_id in ancestor_branch.statement_id_iter() {
+                self.find_singular_terms_in_statement(
+                    &mut stack,
+                    &ancestor_branch.statement_from_id(&statement_id).statement,
+                );
+            }
+        }
+
+        stack
+    }
+
+    fn find_singular_terms_in_statement(
+        &self,
+        mut stack: &mut Vec<SingularTerm>,
+        statement: &Statement,
+    ) {
+        match statement {
+            Statement::Singular(_, ref terms) => terms.iter().for_each(|t| {
+                if !stack.contains(t) {
+                    stack.push(t.clone());
+                }
+            }),
+            Statement::LogicalConjunction(ref lst, ref rst)
+            | Statement::LogicalDisjunction(ref lst, ref rst)
+            | Statement::LogicalConditional(ref lst, ref rst) => {
+                self.find_singular_terms_in_statement(&mut stack, &lst);
+                self.find_singular_terms_in_statement(&mut stack, &rst);
+            }
+            Statement::LogicalNegation(ref rst) => {
+                self.find_singular_terms_in_statement(&mut stack, &rst)
+            }
+            Statement::Existential(_, ref pred) | Statement::Universal(_, ref pred) => {
+                self.find_singular_terms_in_predicate(&mut stack, &pred)
+            }
+            _ => {}
+        }
+    }
+
+    fn find_singular_terms_in_predicate(
+        &self,
+        mut stack: &mut Vec<SingularTerm>,
+        pred: &Predicate,
+    ) {
+        match pred {
+            Predicate::Simple(_, ref terms) => terms.iter().for_each(|t| match t {
+                Term::SingularTerm(ref singular_term) => {
+                    if !stack.contains(singular_term) {
+                        stack.push(singular_term.clone());
+                    }
+                }
+                _ => {}
+            }),
+            Predicate::Conjunctive(ref lpred, ref rpred)
+            | Predicate::Disjunctive(ref lpred, ref rpred)
+            | Predicate::Conditional(ref lpred, ref rpred) => {
+                self.find_singular_terms_in_predicate(&mut stack, &lpred);
+                self.find_singular_terms_in_predicate(&mut stack, &rpred);
+            }
+            Predicate::Negative(rpred) => {
+                self.find_singular_terms_in_predicate(&mut stack, &rpred);
+            }
+        }
+    }
+
+    fn instantiate_quantified_statement(
+        &self,
+        pred: &Predicate,
+        var: &Variable,
+        replace_with: &SingularTerm,
+    ) -> Statement {
+        match pred {
+            Predicate::Simple(ref pred_letter, ref terms) => {
+                let singular_terms = terms
+                    .iter()
+                    .map(|x| match x {
+                        Term::Variable(ref v) => {
+                            if v != var {
+                                panic!("unknown variable in quantified statement")
+                            }
+                            replace_with.clone()
+                        }
+                        Term::SingularTerm(ref t) => t.clone(),
+                    })
+                    .collect::<Vec<SingularTerm>>();
+
+                Statement::Singular(pred_letter.clone(), singular_terms)
+            }
+            Predicate::Conjunctive(ref lpred, ref rpred) => Statement::LogicalConjunction(
+                Box::new(self.instantiate_quantified_statement(&lpred, &var, &replace_with)),
+                Box::new(self.instantiate_quantified_statement(&rpred, &var, &replace_with)),
+            ),
+            Predicate::Negative(ref rpred) => Statement::LogicalNegation(Box::new(
+                self.instantiate_quantified_statement(&rpred, &var, &replace_with),
+            )),
+            Predicate::Disjunctive(ref lpred, ref rpred) => Statement::LogicalDisjunction(
+                Box::new(self.instantiate_quantified_statement(&lpred, &var, &replace_with)),
+                Box::new(self.instantiate_quantified_statement(&rpred, &var, &replace_with)),
+            ),
+            Predicate::Conditional(ref lpred, ref rpred) => Statement::LogicalConditional(
+                Box::new(self.instantiate_quantified_statement(&lpred, &var, &replace_with)),
+                Box::new(self.instantiate_quantified_statement(&rpred, &var, &replace_with)),
+            ),
+        }
+    }
+
+    fn first_unused_in_singular_term_stack(&self, stack: &Vec<SingularTerm>) -> SingularTerm {
+        // Ideally, this would be encapsulated by the parser, so we wouldn't
+        // have to deal with the plain text grammar
+        //
+        // First iterates from 'a' to 'w' checking if any
+        // of these singular terms are available
+        // Returns the first one
+        // If none are, it checks if 'a1' is available (where 1 is a
+        // subscript), or 'b1', or 'c1', or 'd1', etc.
+        // If it is, returns that
+        // If it isn't, it checks if 'a2', 'b2', 'c2', etc. is available
+        // etc. etc. etc.
+        for c in 'a' as u8..='w' as u8 {
+            if !stack.iter().any(|x| x.0 == c as char) {
+                return SingularTerm(c as char, Subscript(None));
+            }
+        }
+
+        for subscript in 1.. {
+            // This subscript is not used by this x
+            // And there isn't some x further in the stack with the same character
+            // and the subscript we want
+            match stack.iter().find_map(|x| {
+                if x.1 != subscript && !stack.iter().any(|y| x.0 == y.0 && y.1 == subscript) {
+                    Some(x)
+                } else {
+                    None
+                }
+            }) {
+                Some(s) => return SingularTerm(s.0, Subscript(Some(subscript))),
+                None => {}
+            }
+        }
+
+        unreachable!()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::{Degree, PredicateLetter, SimpleStatementLetter, SingularTerm, Subscript};
 
     #[test]
     fn queue_node_priority_order_correct() {
@@ -465,6 +745,21 @@ mod tests {
         let mock_statement = Statement::Simple(SimpleStatementLetter('A', Subscript(None)));
 
         let mut queue = BinaryHeap::new();
+
+        // Unordered pushes
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::Conjunction),
+            branch_id: mock_id.clone(),
+        });
+
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::QuantifierExchange),
+            branch_id: mock_id.clone(),
+        });
 
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
@@ -476,14 +771,7 @@ mod tests {
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::Conjunction),
-            branch_id: mock_id.clone(),
-        });
-
-        queue.push(QueueNode {
-            statement_id: mock_id.clone(),
-            statement: mock_statement.clone(),
-            rule: Some(Rule::NegationOfConditional),
+            rule: Some(Rule::ExistentialQuantifier),
             branch_id: mock_id.clone(),
         });
 
@@ -497,7 +785,14 @@ mod tests {
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::Conditional),
+            rule: Some(Rule::Disjunction),
+            branch_id: mock_id.clone(),
+        });
+
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::UniversalQuantifier),
             branch_id: mock_id.clone(),
         });
 
@@ -511,10 +806,20 @@ mod tests {
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::Disjunction),
+            rule: Some(Rule::NegationOfConditional),
             branch_id: mock_id.clone(),
         });
 
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::Conditional),
+            branch_id: mock_id.clone(),
+        });
+
+        assert_eq!(queue.pop().unwrap().rule, Some(Rule::QuantifierExchange));
+        assert_eq!(queue.pop().unwrap().rule, Some(Rule::ExistentialQuantifier));
+        assert_eq!(queue.pop().unwrap().rule, Some(Rule::UniversalQuantifier));
         assert_eq!(queue.pop().unwrap().rule, Some(Rule::DoubleNegation));
         assert_eq!(queue.pop().unwrap().rule, Some(Rule::Conjunction));
         assert_eq!(queue.pop().unwrap().rule, Some(Rule::NegationOfConditional));
@@ -524,20 +829,20 @@ mod tests {
         assert_eq!(queue.pop().unwrap().rule, Some(Rule::Disjunction));
     }
 
-    /*#[test]
+    #[test]
     fn truth_tree_method_works_more_or_less() {
-        let mut algo = TruthTreeMethod::new(&vec![
-            Statement::Simple(SimpleStatementLetter('A', Subscript(None))),
-            Statement::LogicalConjunction(
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'B',
-                    Subscript(None),
-                ))),
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'C',
-                    Subscript(None),
-                ))),
+        let algo = TruthTreeMethod::new(&vec![
+            Statement::Singular(
+                PredicateLetter('A', Subscript(None), Degree(1)),
+                vec![SingularTerm('a', Subscript(None))],
             ),
+            Statement::LogicalNegation(Box::new(Statement::Existential(
+                Variable('x', Subscript(None)),
+                Predicate::Simple(
+                    PredicateLetter('A', Subscript(None), Degree(1)),
+                    vec![Term::Variable(Variable('x', Subscript(None)))],
+                ),
+            ))),
             Statement::LogicalDisjunction(
                 Box::new(Statement::Simple(SimpleStatementLetter(
                     'D',
@@ -550,12 +855,12 @@ mod tests {
             Statement::Simple(SimpleStatementLetter('B', Subscript(None))),
         ]);
 
-        algo.compute();
+        let tree = algo.compute();
 
-        for branch_id in algo.tree.branch_id_iter(&algo.tree.main_trunk_id()) {
+        for branch_id in tree.branch_id_iter(&tree.main_trunk_id()) {
             println!("Branch ID: {:#?}", branch_id.clone());
 
-            let branch = algo.tree.branch_from_id(&branch_id);
+            let branch = tree.branch_from_id(&branch_id);
 
             println!("Branch is closed: {0}", branch.is_closed());
 
@@ -570,5 +875,5 @@ mod tests {
                 println!("  - Derived from: {:#?}", node.derived_from.clone());
             }
         }
-    }*/
+    }
 }

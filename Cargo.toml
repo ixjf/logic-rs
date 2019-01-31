@@ -1,5 +1,5 @@
 [package]
-name = "frege-rs"
+name = "logic-rs"
 version = "0.1.0"
 authors = ["Pedro Fanha <ixjf@outlook.com>"]
 
