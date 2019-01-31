@@ -57,10 +57,10 @@ where
             .unwrap())
     }
 
-    pub fn statement_id_iter(&self) -> StatementIdIter<T> {
-        StatementIdIter {
+    pub fn statement_id_iter(&self) -> NodeIdIter<T> {
+        NodeIdIter {
             tree: &self.children,
-            curr_id: None,
+            stack: vec![self.children.root_node_id().unwrap()],
         }
     }
 
@@ -73,49 +73,18 @@ where
     }
 }
 
-// TODO: StatementIdIter and BranchIdIter can be combined? The logic is the same
-pub struct StatementIdIter<'a, T> {
+pub struct NodeIdIter<'a, T> {
     tree: &'a Tree<T>,
-    curr_id: Option<NodeId>,
-}
-
-impl<'a, T> Iterator for StatementIdIter<'a, T> {
-    type Item = Id;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        // We can clone IDs only because Branches do not allow
-        // removing any statements, hence there will never
-        // be references to non-existing nodes
-
-        match self.curr_id.clone() {
-            Some(i) => match self.tree.children_ids(&i).expect("invalid id").next() {
-                Some(next_id) => {
-                    self.curr_id = Some(next_id.clone());
-                    Some(Id(next_id.clone()))
-                }
-                None => None,
-            },
-            None => {
-                let root_node_id = self.tree.root_node_id().expect("no root node");
-                self.curr_id = Some(root_node_id.clone());
-                Some(Id(root_node_id.clone()))
-            }
-        }
-    }
-}
-
-pub struct BranchIdIter<'a, T> {
-    tree: &'a Tree<Branch<T>>,
     stack: Vec<&'a NodeId>,
 }
 
-impl<'a, T> Iterator for BranchIdIter<'a, T> {
+impl<'a, T> Iterator for NodeIdIter<'a, T> {
     type Item = Id;
 
     fn next(&mut self) -> Option<Self::Item> {
         // self.stack.push(root_item);
 
-        // Preorder traversal
+        // Implementation of preorder traversal over the tree
 
         if self.stack.is_empty() {
             return None;
@@ -127,8 +96,8 @@ impl<'a, T> Iterator for BranchIdIter<'a, T> {
             self.stack.push(&child_id);
         }
 
-        // We can clone IDs only because Branches do not allow
-        // removing any statements, hence there will never
+        // We can clone IDs only because branches/statement trees do not allow
+        // removing any nodes, hence there will never
         // be references to non-existing nodes
         Some(Id(id.clone()))
     }
@@ -160,7 +129,7 @@ where
         }
     }
 
-    pub fn main_trunk(&self) -> Id {
+    pub fn main_trunk_id(&self) -> Id {
         Id(self.tree.root_node_id().unwrap().clone())
     }
 
@@ -174,8 +143,8 @@ where
         }
     }
 
-    pub fn branch_id_iter(&'a self, branch_id: &'a Id) -> BranchIdIter<'a, T> {
-        BranchIdIter {
+    pub fn branch_id_iter(&'a self, branch_id: &'a Id) -> NodeIdIter<'a, Branch<T>> {
+        NodeIdIter {
             tree: &self.tree,
             stack: vec![&branch_id.0],
         }
@@ -221,7 +190,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn struct_statement_id_iter() {
+    fn struct_node_id_iter() {
         let mut tree = TreeBuilder::new().with_node_capacity(3).build();
 
         let root_id = tree.insert(Node::new(2), AsRoot).unwrap();
@@ -229,39 +198,14 @@ mod tests {
         let child_1_id = tree.insert(Node::new(3), UnderNode(&root_id)).unwrap();
         let child_2_id = tree.insert(Node::new(4), UnderNode(&child_1_id)).unwrap();
 
-        let mut iter = StatementIdIter {
-            tree: &tree,
-            curr_id: None,
-        };
-
-        assert_eq!(iter.next(), Some(Id(root_id)));
-        assert_eq!(iter.next(), Some(Id(child_1_id)));
-        assert_eq!(iter.next(), Some(Id(child_2_id)));
-        assert_eq!(iter.next(), None);
-    }
-
-    #[test]
-    fn struct_branch_id_iter() {
-        let mut tree = TreeBuilder::new().with_node_capacity(2).build();
-
-        let root_id = tree
-            .insert(Node::new(Branch::new(vec!["Hello"])), AsRoot)
-            .unwrap();
-
-        let child_1_id = tree
-            .insert(
-                Node::new(Branch::new(vec![", world!"])),
-                UnderNode(&root_id),
-            )
-            .unwrap();
-
-        let mut iter = BranchIdIter {
+        let mut iter = NodeIdIter {
             tree: &tree,
             stack: vec![&root_id],
         };
 
         assert_eq!(iter.next(), Some(Id(root_id.clone())));
-        assert_eq!(iter.next(), Some(Id(child_1_id.clone())));
+        assert_eq!(iter.next(), Some(Id(child_1_id)));
+        assert_eq!(iter.next(), Some(Id(child_2_id)));
         assert_eq!(iter.next(), None);
     }
 
@@ -363,7 +307,7 @@ mod tests {
     fn statement_tree_main_trunk() {
         let statement_tree = StatementTree::new(Branch::new(vec!["Hello!"]));
 
-        let root_id = statement_tree.main_trunk();
+        let root_id = statement_tree.main_trunk_id();
 
         assert_eq!(
             root_id,
@@ -375,7 +319,7 @@ mod tests {
     fn statement_tree_reverse_branch_id_iter() {
         let mut statement_tree = StatementTree::new(Branch::new(vec!["Hello"]));
 
-        let root_id = statement_tree.main_trunk();
+        let root_id = statement_tree.main_trunk_id();
 
         let child_branch_1_id =
             statement_tree.append_branch(Branch::new(vec![", world!"]), &root_id);
@@ -383,7 +327,7 @@ mod tests {
         let mut iter = statement_tree.reverse_branch_id_iter(&child_branch_1_id);
 
         assert_eq!(iter.next(), Some(Id(child_branch_1_id.0.clone())));
-        assert_eq!(iter.next(), Some(statement_tree.main_trunk()));
+        assert_eq!(iter.next(), Some(statement_tree.main_trunk_id()));
         assert_eq!(iter.next(), None);
     }
 
@@ -391,14 +335,14 @@ mod tests {
     fn statement_tree_branch_id_iter() {
         let mut statement_tree = StatementTree::new(Branch::new(vec!["Hello"]));
 
-        let root_id = statement_tree.main_trunk();
+        let root_id = statement_tree.main_trunk_id();
 
         let child_branch_1_id =
             statement_tree.append_branch(Branch::new(vec![", world!"]), &root_id);
 
         let mut iter = statement_tree.branch_id_iter(&root_id);
 
-        assert_eq!(iter.next(), Some(statement_tree.main_trunk()));
+        assert_eq!(iter.next(), Some(statement_tree.main_trunk_id()));
         assert_eq!(iter.next(), Some(Id(child_branch_1_id.0.clone())));
         assert_eq!(iter.next(), None);
     }
@@ -407,7 +351,7 @@ mod tests {
     fn statement_tree_branch_from_id_mut() {
         let mut statement_tree = StatementTree::new(Branch::new(vec!["Hello"]));
 
-        let root_id = statement_tree.main_trunk();
+        let root_id = statement_tree.main_trunk_id();
 
         let branch = statement_tree.branch_from_id_mut(&root_id);
 
@@ -420,7 +364,7 @@ mod tests {
     fn statement_tree_append_branch() {
         let mut statement_tree = StatementTree::new(Branch::new(vec!["Hello"]));
 
-        let root_id = statement_tree.main_trunk();
+        let root_id = statement_tree.main_trunk_id();
 
         let child_branch_1_id =
             statement_tree.append_branch(Branch::new(vec![", world!"]), &root_id);
