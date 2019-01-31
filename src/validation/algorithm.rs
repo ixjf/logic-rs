@@ -24,27 +24,31 @@ struct QueueNode {
 
 impl Ord for QueueNode {
     fn cmp(&self, other: &QueueNode) -> Ordering {
+        // Priority order, top should come first, bottom last
         let rule_priority_order: [Rule; 7] = [
-            Rule::Conditional,
-            Rule::NegationOfConjunction,
-            Rule::Disjunction,
             Rule::DoubleNegation,
             Rule::Conjunction,
             Rule::NegationOfConditional,
             Rule::NegationOfDisjunction,
+            Rule::Conditional,
+            Rule::NegationOfConjunction,
+            Rule::Disjunction,
         ];
 
         match (&self.rule, &other.rule) {
-            (Some(_), None) => Ordering::Greater,
-            (None, Some(_)) => Ordering::Less,
+            // Atomic statements should come first in the queue
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            // If rule B comes after rule A in rule_priority_order,
+            // then A should come first
             (Some(rule_a), Some(rule_b)) => rule_priority_order
                 .iter()
-                .position(|x| *x == *rule_a)
+                .position(|x| *x == *rule_b)
                 .unwrap()
                 .cmp(
                     &rule_priority_order
                         .iter()
-                        .position(|x| *x == *rule_b)
+                        .position(|x| *x == *rule_a)
                         .unwrap(),
                 ),
             (None, None) => Ordering::Equal,
@@ -458,6 +462,73 @@ mod tests {
     use super::*;
 
     #[test]
+    fn queue_node_priority_order_correct() {
+        let branch = Branch::new(vec!["mock"]);
+        let mock_id = branch.statement_id_iter().next().unwrap();
+        let mock_statement = Statement::Simple(SimpleStatementLetter('A', Subscript(None)));
+
+        let mut queue = BinaryHeap::new();
+
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::DoubleNegation),
+            branch_id: mock_id.clone(),
+        });
+
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::Conjunction),
+            branch_id: mock_id.clone(),
+        });
+
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::NegationOfConditional),
+            branch_id: mock_id.clone(),
+        });
+
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::NegationOfDisjunction),
+            branch_id: mock_id.clone(),
+        });
+
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::Conditional),
+            branch_id: mock_id.clone(),
+        });
+
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::NegationOfConjunction),
+            branch_id: mock_id.clone(),
+        });
+
+        queue.push(QueueNode {
+            statement_id: mock_id.clone(),
+            statement: mock_statement.clone(),
+            rule: Some(Rule::Disjunction),
+            branch_id: mock_id.clone(),
+        });
+
+        assert_eq!(queue.pop().unwrap().rule, Some(Rule::DoubleNegation));
+        assert_eq!(queue.pop().unwrap().rule, Some(Rule::Conjunction));
+        assert_eq!(queue.pop().unwrap().rule, Some(Rule::NegationOfConditional));
+        assert_eq!(queue.pop().unwrap().rule, Some(Rule::NegationOfDisjunction));
+        assert_eq!(queue.pop().unwrap().rule, Some(Rule::Conditional));
+        assert_eq!(queue.pop().unwrap().rule, Some(Rule::NegationOfConjunction));
+        assert_eq!(queue.pop().unwrap().rule, Some(Rule::Disjunction));
+    }
+
+    /*
+    #[test]
     fn truth_tree_method_works_more_or_less() {
         let mut algo = TruthTreeMethod::new(&vec![
             Statement::Simple(SimpleStatementLetter('A', Subscript(None))),
@@ -503,5 +574,5 @@ mod tests {
                 println!("  - Derived from: {:#?}", node.derived_from.clone());
             }
         }
-    }
+    }*/
 }
