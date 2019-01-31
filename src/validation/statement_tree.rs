@@ -73,6 +73,7 @@ where
     }
 }
 
+// TODO: StatementIdIter and BranchIdIter can be combined? The logic is the same
 pub struct StatementIdIter<'a, T> {
     tree: &'a Tree<T>,
     curr_id: Option<NodeId>,

@@ -1,2 +1,2 @@
-# frege-rs
+# logic-rs
 A relational predicate logic parser
