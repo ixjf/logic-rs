@@ -246,10 +246,6 @@ impl TruthTreeMethod {
         // happen in the current state of things of 'compute'), the branch will
         // close.
 
-        // TODO: For some reason, this isn't working with the current test
-        // It doesn't seem to ever compare ~C with C, and so never closes
-        // the branch
-
         for ancestor_branch_id in self.tree.reverse_branch_id_iter(&branch_id) {
             let ancestor_branch = self.tree.branch_from_id(&ancestor_branch_id);
 
@@ -258,16 +254,14 @@ impl TruthTreeMethod {
 
                 match (&node.statement, statement) {
                     (Statement::LogicalNegation(ref a), ref b @ _) => {
-                        dbg!(&a);
-                        dbg!(&b);
-
-                        return dbg!(**a == **b);
+                        if **a == **b {
+                            return true;
+                        }
                     }
                     (ref a @ _, Statement::LogicalNegation(ref b)) => {
-                        dbg!(&a);
-                        dbg!(&b);
-
-                        return dbg!(**a == **b);
+                        if **a == **b {
+                            return true;
+                        }
                     }
                     _ => {}
                 }
@@ -491,7 +485,7 @@ mod tests {
 
         algo.compute();
 
-        /*for branch_id in algo.tree.branch_id_iter(&algo.tree.main_trunk()) {
+        for branch_id in algo.tree.branch_id_iter(&algo.tree.main_trunk()) {
             println!("Branch ID: {:#?}", branch_id.clone());
 
             let branch = algo.tree.branch_from_id(&branch_id);
@@ -508,6 +502,6 @@ mod tests {
                 println!("  - Statement: {:#?}", node.statement.clone());
                 println!("  - Derived from: {:#?}", node.derived_from.clone());
             }
-        }*/
+        }
     }
 }
