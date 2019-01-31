@@ -1,1 +1,3 @@
-pub mod truth_tree;
+pub mod algorithm;
+
+mod statement_tree;

@@ -1,3 +1,6 @@
+// TODO: Maybe semantic checks should be impl for the following types?
+// And they're pub(in parser)
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Subscript(pub Option<u64>);
 
@@ -31,19 +34,19 @@ impl PartialEq<u64> for Degree {
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct PredicateLetter(pub char, pub Subscript, pub Degree);
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ParseTree {
     StatementSet(Vec<Statement>),
     Argument(Vec<Statement>, Statement),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
     SingularTerm(SingularTerm),
     Variable(Variable),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Statement {
     Simple(SimpleStatementLetter),
     Singular(PredicateLetter, Vec<SingularTerm>),
@@ -55,7 +58,7 @@ pub enum Statement {
     Universal(Variable, Predicate),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Predicate {
     Simple(PredicateLetter, Vec<Term>),
     Conjunctive(Box<Predicate>, Box<Predicate>),
