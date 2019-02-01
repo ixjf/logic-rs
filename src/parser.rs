@@ -35,10 +35,13 @@ impl PartialEq<u64> for Degree {
 pub struct PredicateLetter(pub char, pub Subscript, pub Degree);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ParseTree {
+pub enum Input {
     StatementSet(Vec<Statement>),
     Argument(Vec<Statement>, Statement),
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseTree(pub Input);
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
@@ -153,7 +156,7 @@ impl Parser {
             }
         }
 
-        Ok(ParseTree::StatementSet(statements))
+        Ok(ParseTree(Input::StatementSet(statements)))
     }
 
     fn statement_into_ast(&self, pair: Pair<Rule>) -> Result<Statement, Error> {
@@ -570,7 +573,7 @@ impl Parser {
         // That means that the conclusion will be at the back of the vector
         let conclusion = statements.pop().unwrap();
 
-        Ok(ParseTree::Argument(statements, conclusion))
+        Ok(ParseTree(Input::Argument(statements, conclusion)))
     }
 }
 
@@ -590,8 +593,8 @@ mod tests {
         let parser = Parser::new();
 
         match parser.parse("{A, B, C, D, F, G}") {
-            Ok(parse_tree) => match parse_tree {
-                ParseTree::StatementSet(_) => {}
+            Ok(parse_tree) => match parse_tree.0 {
+                Input::StatementSet(_) => {}
                 _ => assert!(false),
             },
             _ => assert!(false),
@@ -603,8 +606,8 @@ mod tests {
         let parser = Parser::new();
 
         match parser.parse("A, B, C, D, F .:. G") {
-            Ok(parse_tree) => match parse_tree {
-                ParseTree::Argument(_, _) => {}
+            Ok(parse_tree) => match parse_tree.0 {
+                Input::Argument(_, _) => {}
                 _ => assert!(false),
             },
             _ => assert!(false),
@@ -616,8 +619,8 @@ mod tests {
         let parser = Parser::new();
 
         match parser.parse("{(A & B)}") {
-            Ok(parse_tree) => match parse_tree {
-                ParseTree::StatementSet(mut statements) => {
+            Ok(parse_tree) => match parse_tree.0 {
+                Input::StatementSet(mut statements) => {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::LogicalConjunction(a, b) => match (*a, *b) {
@@ -638,8 +641,8 @@ mod tests {
         let parser = Parser::new();
 
         match parser.parse("{~A}") {
-            Ok(parse_tree) => match parse_tree {
-                ParseTree::StatementSet(mut statements) => {
+            Ok(parse_tree) => match parse_tree.0 {
+                Input::StatementSet(mut statements) => {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::LogicalNegation(a) => match *a {
@@ -660,8 +663,8 @@ mod tests {
         let parser = Parser::new();
 
         match parser.parse("{(A ∨ B)}") {
-            Ok(parse_tree) => match parse_tree {
-                ParseTree::StatementSet(mut statements) => {
+            Ok(parse_tree) => match parse_tree.0 {
+                Input::StatementSet(mut statements) => {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::LogicalDisjunction(a, b) => match (*a, *b) {
@@ -682,8 +685,8 @@ mod tests {
         let parser = Parser::new();
 
         match parser.parse("{(A ⊃ B)}") {
-            Ok(parse_tree) => match parse_tree {
-                ParseTree::StatementSet(mut statements) => {
+            Ok(parse_tree) => match parse_tree.0 {
+                Input::StatementSet(mut statements) => {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::LogicalConditional(a, b) => match (*a, *b) {
@@ -704,8 +707,8 @@ mod tests {
         let parser = Parser::new();
 
         match parser.parse("{∃z(A¹z & B¹z)}") {
-            Ok(parse_tree) => match parse_tree {
-                ParseTree::StatementSet(mut statements) => {
+            Ok(parse_tree) => match parse_tree.0 {
+                Input::StatementSet(mut statements) => {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::Existential(a, b) => match (a, b) {
@@ -746,8 +749,8 @@ mod tests {
         let parser = Parser::new();
 
         match parser.parse("{∀z(A¹z & B¹z)}") {
-            Ok(parse_tree) => match parse_tree {
-                ParseTree::StatementSet(mut statements) => {
+            Ok(parse_tree) => match parse_tree.0 {
+                Input::StatementSet(mut statements) => {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::Universal(a, b) => match (a, b) {
@@ -768,8 +771,8 @@ mod tests {
         let parser = Parser::new();
 
         match parser.parse("{A₂}") {
-            Ok(parse_tree) => match parse_tree {
-                ParseTree::StatementSet(mut statements) => {
+            Ok(parse_tree) => match parse_tree.0 {
+                Input::StatementSet(mut statements) => {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::Simple(st_letter) => {
@@ -790,8 +793,8 @@ mod tests {
         let parser = Parser::new();
 
         match parser.parse("{A₂¹b}") {
-            Ok(parse_tree) => match parse_tree {
-                ParseTree::StatementSet(mut statements) => {
+            Ok(parse_tree) => match parse_tree.0 {
+                Input::StatementSet(mut statements) => {
                     assert!(statements.len() == 1);
                     match statements.pop().unwrap() {
                         Statement::Singular(predicate_letter, mut terms) => {

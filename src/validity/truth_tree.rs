@@ -115,16 +115,16 @@ impl<'a, T> Iterator for ReverseBranchIdIter<'a, T> {
     }
 }
 
-pub struct StatementTree<T> {
+pub struct TruthTree<T> {
     tree: Tree<Branch<T>>,
 }
 
-impl<'a, T> StatementTree<T>
+impl<'a, T> TruthTree<T>
 where
     T: Clone,
 {
     pub fn new(main_branch: Branch<T>) -> Self {
-        StatementTree {
+        TruthTree {
             tree: TreeBuilder::new().with_root(Node::new(main_branch)).build(),
         }
     }
@@ -305,7 +305,7 @@ mod tests {
 
     #[test]
     fn statement_tree_main_trunk() {
-        let statement_tree = StatementTree::new(Branch::new(vec!["Hello!"]));
+        let statement_tree = TruthTree::new(Branch::new(vec!["Hello!"]));
 
         let root_id = statement_tree.main_trunk_id();
 
@@ -317,7 +317,7 @@ mod tests {
 
     #[test]
     fn statement_tree_reverse_branch_id_iter() {
-        let mut statement_tree = StatementTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
 
         let root_id = statement_tree.main_trunk_id();
 
@@ -333,7 +333,7 @@ mod tests {
 
     #[test]
     fn statement_tree_branch_id_iter() {
-        let mut statement_tree = StatementTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
 
         let root_id = statement_tree.main_trunk_id();
 
@@ -349,7 +349,7 @@ mod tests {
 
     #[test]
     fn statement_tree_branch_from_id_mut() {
-        let mut statement_tree = StatementTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
 
         let root_id = statement_tree.main_trunk_id();
 
@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn statement_tree_append_branch() {
-        let mut statement_tree = StatementTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
 
         let root_id = statement_tree.main_trunk_id();
 

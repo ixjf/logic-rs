@@ -1,4 +1,4 @@
-use super::statement_tree::*;
+use super::truth_tree::*;
 use crate::parser::{Predicate, SingularTerm, Statement, Subscript, Term, Variable};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -78,23 +78,24 @@ struct RuleDeriveResult {
     whatdo: DerivedRuleWhatdo,
 }
 
+// FIXME Maybe this should be in truth_tree.rs?
 #[derive(Clone, Debug)]
-pub struct TreeNodeLocation(Id, Id); // Statement ID, Branch ID
+pub struct TreeNodeLocation(pub Id, pub Id); // Statement ID, Branch ID
 
 #[derive(Clone, Debug)]
 pub struct TreeNode {
-    statement: Statement,
-    derived_from: Option<(TreeNodeLocation, Rule)>,
+    pub statement: Statement,
+    pub derived_from: Option<(TreeNodeLocation, Rule)>,
 }
 
 pub struct TruthTreeMethod {
-    tree: StatementTree<TreeNode>,
+    tree: TruthTree<TreeNode>,
 }
 
 impl TruthTreeMethod {
     pub fn new(statements: &Vec<Statement>) -> Self {
         TruthTreeMethod {
-            tree: StatementTree::new(Branch::new(
+            tree: TruthTree::new(Branch::new(
                 statements
                     .iter()
                     .map(|x| TreeNode {
@@ -106,7 +107,7 @@ impl TruthTreeMethod {
         }
     }
 
-    pub fn compute(mut self) -> StatementTree<TreeNode> {
+    pub fn compute(mut self) -> TruthTree<TreeNode> {
         let mut queue = BinaryHeap::new();
 
         // Populate the queue with the main trunk
@@ -224,7 +225,8 @@ impl TruthTreeMethod {
                             };
                             queue.push(new_node);
 
-                            // If the statement contradicts another in child_branch_id or
+                            /*
+                            // If the statement contradicts another in derived_statement_branch_id or
                             // any of its parents, keep the statement in the branch
                             // but close it and move on to the next one
                             if self.statement_is_contradiction(&x, &derived_statement_branch_id) {
@@ -232,11 +234,19 @@ impl TruthTreeMethod {
                                     .branch_from_id_mut(&derived_statement_branch_id)
                                     .close();
                                 break;
-                            }
+                            }*/
                         }
                     }
                 }
-                None => {} // No rule was applied, statement is already on tree, so we do nothing here
+                None => {
+                    // No rule to apply (statement is already atomic formula),
+                    // statement is already on tree, so we do nothing here
+                    // except checking for contradictions
+                    if self.statement_is_contradiction(&statement, &branch_id) {
+                        self.tree.branch_from_id_mut(&branch_id).close();
+                        continue;
+                    }
+                }
             }
 
             // Original rules don't need to be marked done
@@ -829,6 +839,7 @@ mod tests {
         assert_eq!(queue.pop().unwrap().rule, Some(Rule::Disjunction));
     }
 
+    /*
     #[test]
     fn truth_tree_method_works_more_or_less() {
         let algo = TruthTreeMethod::new(&vec![
@@ -875,5 +886,5 @@ mod tests {
                 println!("  - Derived from: {:#?}", node.derived_from.clone());
             }
         }
-    }
+    }*/
 }
