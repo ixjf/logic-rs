@@ -111,25 +111,19 @@ impl TruthTreeMethod {
         let mut queue = BinaryHeap::new();
 
         // Populate the queue with the main trunk
-        let main_trunk_id = self.tree.main_trunk_id();
-
+        for (statement_id, tree_node) in self
+            .tree
+            .branch_from_id(&self.tree.main_trunk_id())
+            .statements()
         {
-            let main_trunk = self.tree.branch_from_id(&main_trunk_id);
+            let rule = self.matches_some_rule(&tree_node.statement);
 
-            for statement_id in main_trunk.statement_id_iter() {
-                let statement = main_trunk
-                    .statement_from_id(&statement_id)
-                    .statement
-                    .clone();
-                let rule = self.matches_some_rule(&statement);
-
-                queue.push(QueueNode {
-                    statement_id: statement_id.clone(),
-                    statement,
-                    rule,
-                    branch_id: main_trunk_id.clone(),
-                });
-            }
+            queue.push(QueueNode {
+                statement_id: statement_id.clone(),
+                statement: tree_node.statement.clone(),
+                rule,
+                branch_id: self.tree.main_trunk_id(),
+            });
         }
 
         // All nodes on the queue are already on the tree
@@ -143,7 +137,7 @@ impl TruthTreeMethod {
         {
             if self
                 .tree
-                .branch_id_iter(&main_trunk_id)
+                .traverse_downwards_branch_ids(&self.tree.main_trunk_id())
                 .filter(|x| {
                     !self.tree.branch_from_id(&x).is_closed() && self.tree.branch_is_last_child(&x)
                 })
@@ -161,7 +155,7 @@ impl TruthTreeMethod {
                     // Open child branches of branch where original statement is
                     let open_branches_ids = self
                         .tree
-                        .branch_id_iter(&branch_id)
+                        .traverse_downwards_branch_ids(&branch_id)
                         .filter(|x| {
                             !self.tree.branch_from_id(&x).is_closed()
                                 && self.tree.branch_is_last_child(&x)
@@ -178,7 +172,7 @@ impl TruthTreeMethod {
                                         let new_statement_id = self
                                             .tree
                                             .branch_from_id_mut(&child_branch_id)
-                                            .append(TreeNode {
+                                            .append_statement(TreeNode {
                                                 statement: x.clone(),
                                                 derived_from: Some((
                                                     TreeNodeLocation(
@@ -206,10 +200,11 @@ impl TruthTreeMethod {
                                         }]);
 
                                         let root_statement_id =
-                                            new_branch.statement_id_iter().next().unwrap();
+                                            new_branch.statement_ids().next().unwrap();
 
-                                        let new_branch_id =
-                                            self.tree.append_branch(new_branch, &child_branch_id);
+                                        let new_branch_id = self
+                                            .tree
+                                            .append_branch_at(new_branch, &child_branch_id);
 
                                         (root_statement_id, new_branch_id.clone())
                                     }
@@ -265,13 +260,9 @@ impl TruthTreeMethod {
         // happen in the current state of things of 'compute'), the branch will
         // close.
 
-        for ancestor_branch_id in self.tree.reverse_branch_id_iter(&branch_id) {
-            let ancestor_branch = self.tree.branch_from_id(&ancestor_branch_id);
-
-            for statement_id in ancestor_branch.statement_id_iter() {
-                let node = ancestor_branch.statement_from_id(&statement_id);
-
-                match (&node.statement, statement) {
+        for (_, ancestor_branch) in self.tree.traverse_upwards_branches(&branch_id) {
+            for (_, tree_node) in ancestor_branch.statements() {
+                match (&tree_node.statement, statement) {
                     (Statement::LogicalNegation(ref a), ref b @ _) => {
                         if **a == **b {
                             return true;
@@ -475,15 +466,11 @@ impl TruthTreeMethod {
                             let instantiated_statement =
                                 self.instantiate_quantified_statement(&pred, &var, &x);
 
-                            for ancestor_branch_id in self.tree.reverse_branch_id_iter(&branch_id) {
-                                let ancestor_branch = self.tree.branch_from_id(&ancestor_branch_id);
-
-                                for statement_id in ancestor_branch.statement_id_iter() {
-                                    if instantiated_statement
-                                        == ancestor_branch
-                                            .statement_from_id(&statement_id)
-                                            .statement
-                                    {
+                            for (_, ancestor_branch) in
+                                self.tree.traverse_upwards_branches(&branch_id)
+                            {
+                                for (_, tree_node) in ancestor_branch.statements() {
+                                    if instantiated_statement == tree_node.statement {
                                         return false;
                                     }
                                 }
@@ -597,10 +584,10 @@ impl TruthTreeMethod {
     fn build_singular_term_stack_for_branch(&self, branch_id: &Id) -> Vec<SingularTerm> {
         let mut stack = Vec::new();
 
-        for ancestor_branch_id in self.tree.reverse_branch_id_iter(&branch_id) {
+        for ancestor_branch_id in self.tree.traverse_upwards_branch_ids(&branch_id) {
             let ancestor_branch = self.tree.branch_from_id(&ancestor_branch_id);
 
-            for statement_id in ancestor_branch.statement_id_iter() {
+            for statement_id in ancestor_branch.statement_ids() {
                 self.find_singular_terms_in_statement(
                     &mut stack,
                     &ancestor_branch.statement_from_id(&statement_id).statement,
@@ -751,7 +738,7 @@ mod tests {
     #[test]
     fn queue_node_priority_order_correct() {
         let branch = Branch::new(vec!["mock"]);
-        let mock_id = branch.statement_id_iter().next().unwrap();
+        let mock_id = branch.statement_ids().next().unwrap();
         let mock_statement = Statement::Simple(SimpleStatementLetter('A', Subscript(None)));
 
         let mut queue = BinaryHeap::new();

@@ -2,6 +2,7 @@
 name = "logic-rs"
 version = "0.1.0"
 authors = ["Pedro Fanha <ixjf@outlook.com>"]
+edition = "2018"
 
 [dependencies]
 pest = "2.0"

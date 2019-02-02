@@ -90,7 +90,7 @@ pub struct Error {
 }
 
 impl Error {
-    pub(in parser) fn new_from_custom_error(span: Span, decorated_message: &str) -> Self {
+    pub(in crate::parser) fn new_from_custom_error(span: Span, decorated_message: &str) -> Self {
         let e: pest_error<Rule> = pest_error::new_from_span(
             pest_error_variant::CustomError {
                 message: decorated_message.to_owned(),
@@ -104,7 +104,7 @@ impl Error {
         }
     }
 
-    pub(in parser) fn new_from_parsing_error(e: pest_error<Rule>) -> Error {
+    pub(in crate::parser) fn new_from_parsing_error(e: pest_error<Rule>) -> Error {
         use pest::error::LineColLocation;
 
         let position = match e.line_col {

@@ -103,7 +103,7 @@ pub fn is_statement_contingency(
 
 fn is_consistent(truth_tree: &TruthTree<TreeNode>) -> bool {
     truth_tree
-        .branch_id_iter(&truth_tree.main_trunk_id())
+        .traverse_downwards_branch_ids(&truth_tree.main_trunk_id())
         .filter(|x| {
             truth_tree.branch_is_last_child(&x) && !truth_tree.branch_from_id(&x).is_closed()
         })
