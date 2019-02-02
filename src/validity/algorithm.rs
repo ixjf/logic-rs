@@ -810,6 +810,8 @@ mod tests {
         assert_eq!(queue.pop().unwrap().rule, Some(Rule::Disjunction));
     }
 
+    // FIXME Algorithm needs proper testing. Not sure how to do that
+
     /*
     #[test]
     fn truth_tree_method_works_more_or_less() {

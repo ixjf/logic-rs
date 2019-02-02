@@ -605,7 +605,7 @@ mod tests {
     fn parses_argument() {
         let parser = Parser::new();
 
-        match parser.parse("A, B, C, D, F .:. G") {
+        match parser.parse("A, B, C, D, F ∴ G") {
             Ok(parse_tree) => match parse_tree.0 {
                 Input::Argument(_, _) => {}
                 _ => assert!(false),

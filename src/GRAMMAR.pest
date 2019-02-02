@@ -1,6 +1,5 @@
 // TODO: Support for groupers, nested quantifiers!!! (can't have quantifier
-// with existing variable as well! and a quantifier statement's predicate
-// must necessarily have that variable bound in at least one place)
+// with existing variable as well)
 
 // This specification does not take into account these:
 // 1. Degree of predicate matching number of terms
@@ -27,7 +26,7 @@ statement_set = {
     statement_set_closing 
 }
 
-conclusion_indicator = _{ ".:." }
+conclusion_indicator = _{ "\u{2234}" }
 premise = { statement }
 conclusion = { statement }
 argument = {
