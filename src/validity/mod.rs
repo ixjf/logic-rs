@@ -1,7 +1,7 @@
 mod algorithm;
 mod truth_tree;
 
-use self::algorithm::{TreeNode, TruthTreeMethod};
+use self::algorithm::TruthTreeMethod;
 use self::truth_tree::TruthTree;
 use crate::parser::{Input, ParseTree, Statement};
 
@@ -13,9 +13,7 @@ pub enum Error {
     MoreThanOneStatement,
 }
 
-pub fn is_statement_set_consistent(
-    parse_tree: &ParseTree,
-) -> Result<(bool, TruthTree<TreeNode>), Error> {
+pub fn is_statement_set_consistent(parse_tree: &ParseTree) -> Result<(bool, TruthTree), Error> {
     match parse_tree.0 {
         Input::StatementSet(ref statements) => {
             let truth_tree = TruthTreeMethod::new(&statements).compute();
@@ -27,7 +25,7 @@ pub fn is_statement_set_consistent(
     }
 }
 
-pub fn is_argument_valid(parse_tree: &ParseTree) -> Result<(bool, TruthTree<TreeNode>), Error> {
+pub fn is_argument_valid(parse_tree: &ParseTree) -> Result<(bool, TruthTree), Error> {
     match parse_tree.0 {
         Input::Argument(ref premises, ref conclusion) => {
             // Pass statement list as '<premise>, <premise>,..., negation of <conclusion>'
@@ -43,9 +41,7 @@ pub fn is_argument_valid(parse_tree: &ParseTree) -> Result<(bool, TruthTree<Tree
     }
 }
 
-pub fn is_statement_contradiction(
-    parse_tree: &ParseTree,
-) -> Result<(bool, TruthTree<TreeNode>), Error> {
+pub fn is_statement_contradiction(parse_tree: &ParseTree) -> Result<(bool, TruthTree), Error> {
     match parse_tree.0 {
         Input::StatementSet(ref statements) => {
             if statements.len() > 1 {
@@ -62,9 +58,7 @@ pub fn is_statement_contradiction(
     }
 }
 
-pub fn is_statement_tautology(
-    parse_tree: &ParseTree,
-) -> Result<(bool, TruthTree<TreeNode>), Error> {
+pub fn is_statement_tautology(parse_tree: &ParseTree) -> Result<(bool, TruthTree), Error> {
     match parse_tree.0 {
         Input::StatementSet(ref statements) => {
             if statements.len() > 1 {
@@ -88,7 +82,7 @@ pub fn is_statement_tautology(
 
 pub fn is_statement_contingency(
     parse_tree: &ParseTree,
-) -> Result<(bool, TruthTree<TreeNode>, TruthTree<TreeNode>), Error> {
+) -> Result<(bool, TruthTree, TruthTree), Error> {
     let truth_tree_contradiction = is_statement_contradiction(&parse_tree)?;
     let truth_tree_tautology = is_statement_tautology(&parse_tree)?;
 
@@ -101,7 +95,7 @@ pub fn is_statement_contingency(
     ))
 }
 
-fn is_consistent(truth_tree: &TruthTree<TreeNode>) -> bool {
+fn is_consistent(truth_tree: &TruthTree) -> bool {
     truth_tree
         .traverse_downwards_branch_ids(&truth_tree.main_trunk_id())
         .filter(|x| {

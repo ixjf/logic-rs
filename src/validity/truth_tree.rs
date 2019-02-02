@@ -1,20 +1,28 @@
+use super::algorithm::Rule;
+use crate::parser::Statement;
 use id_tree::InsertBehavior::*;
 use id_tree::*;
 use std::iter::{once, Chain, Once};
 
+#[derive(Clone, Debug)]
+pub struct BranchNodeLocation(pub Id, pub Id); // Statement ID, Branch ID
+
+#[derive(Clone, Debug)]
+pub struct BranchNode {
+    pub statement: Statement,
+    pub derived_from: Option<(BranchNodeLocation, Rule)>,
+}
+
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub struct Id(NodeId);
 
-pub struct Branch<T> {
-    children: Tree<T>,
+pub struct Branch {
+    children: Tree<BranchNode>,
     closed: bool,
 }
 
-impl<T> Branch<T>
-where
-    T: Clone,
-{
-    pub fn new(trunk: Vec<T>) -> Self {
+impl Branch {
+    pub fn new(trunk: Vec<BranchNode>) -> Self {
         assert!(trunk.len() > 0);
 
         let mut tree = TreeBuilder::new().build();
@@ -44,7 +52,7 @@ where
         self.closed
     }
 
-    pub fn append_statement(&mut self, statement: T) -> Id {
+    pub fn append_statement(&mut self, statement: BranchNode) -> Id {
         assert!(!self.closed, "attempt to append statement to closed branch");
 
         let last_child_id = self.statement_ids().last().unwrap();
@@ -55,18 +63,18 @@ where
             .unwrap())
     }
 
-    pub fn statement_ids(&self) -> IdsIter<T> {
+    pub fn statement_ids(&self) -> IdsIter<BranchNode> {
         IdsIter {
             tree: &self.children,
             stack: vec![self.children.root_node_id().unwrap()],
         }
     }
 
-    pub fn statement_from_id(&self, id: &Id) -> &T {
+    pub fn statement_from_id(&self, id: &Id) -> &BranchNode {
         self.children.get(&id.0).expect("invalid id").data()
     }
 
-    pub fn statements(&self) -> StatementsIter<T> {
+    pub fn statements(&self) -> StatementsIter {
         StatementsIter {
             tree: &self.children,
             stack: vec![self.children.root_node_id().unwrap()],
@@ -74,13 +82,13 @@ where
     }
 }
 
-pub struct StatementsIter<'a, T> {
-    tree: &'a Tree<T>,
+pub struct StatementsIter<'a> {
+    tree: &'a Tree<BranchNode>,
     stack: Vec<&'a NodeId>,
 }
 
-impl<'a, T> Iterator for StatementsIter<'a, T> {
-    type Item = (Id, &'a T);
+impl<'a> Iterator for StatementsIter<'a> {
+    type Item = (Id, &'a BranchNode);
 
     fn next(&mut self) -> Option<Self::Item> {
         // self.stack.push(root_item);
@@ -134,11 +142,11 @@ impl<'a, T> Iterator for IdsIter<'a, T> {
     }
 }
 
-pub struct UpwardsBranchIdsIter<'a, T> {
-    iter: Chain<Once<&'a NodeId>, AncestorIds<'a, Branch<T>>>,
+pub struct UpwardsBranchIdsIter<'a> {
+    iter: Chain<Once<&'a NodeId>, AncestorIds<'a, Branch>>,
 }
 
-impl<'a, T> Iterator for UpwardsBranchIdsIter<'a, T> {
+impl<'a> Iterator for UpwardsBranchIdsIter<'a> {
     type Item = Id;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -146,13 +154,13 @@ impl<'a, T> Iterator for UpwardsBranchIdsIter<'a, T> {
     }
 }
 
-pub struct UpwardsBranchesIter<'a, T> {
-    iter: Chain<Once<&'a NodeId>, AncestorIds<'a, Branch<T>>>,
-    tree: &'a Tree<Branch<T>>,
+pub struct UpwardsBranchesIter<'a> {
+    iter: Chain<Once<&'a NodeId>, AncestorIds<'a, Branch>>,
+    tree: &'a Tree<Branch>,
 }
 
-impl<'a, T> Iterator for UpwardsBranchesIter<'a, T> {
-    type Item = (Id, &'a Branch<T>);
+impl<'a> Iterator for UpwardsBranchesIter<'a> {
+    type Item = (Id, &'a Branch);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
@@ -173,15 +181,12 @@ impl<'a> Iterator for BranchImmediateChildrenIdsIter<'a> {
     }
 }
 
-pub struct TruthTree<T> {
-    tree: Tree<Branch<T>>,
+pub struct TruthTree {
+    tree: Tree<Branch>,
 }
 
-impl<'a, T> TruthTree<T>
-where
-    T: Clone,
-{
-    pub fn new(main_branch: Branch<T>) -> Self {
+impl<'a> TruthTree {
+    pub fn new(main_branch: Branch) -> Self {
         TruthTree {
             tree: TreeBuilder::new().with_root(Node::new(main_branch)).build(),
         }
@@ -191,7 +196,7 @@ where
         Id(self.tree.root_node_id().unwrap().clone())
     }
 
-    pub fn traverse_upwards_branch_ids(&'a self, branch_id: &'a Id) -> UpwardsBranchIdsIter<'a, T> {
+    pub fn traverse_upwards_branch_ids(&'a self, branch_id: &'a Id) -> UpwardsBranchIdsIter<'a> {
         UpwardsBranchIdsIter {
             iter: once(&branch_id.0).chain(
                 self.tree
@@ -201,7 +206,7 @@ where
         }
     }
 
-    pub fn traverse_upwards_branches(&'a self, branch_id: &'a Id) -> UpwardsBranchesIter<'a, T> {
+    pub fn traverse_upwards_branches(&'a self, branch_id: &'a Id) -> UpwardsBranchesIter<'a> {
         UpwardsBranchesIter {
             iter: once(&branch_id.0).chain(
                 self.tree
@@ -212,7 +217,7 @@ where
         }
     }
 
-    pub fn traverse_downwards_branch_ids(&'a self, branch_id: &'a Id) -> IdsIter<'a, Branch<T>> {
+    pub fn traverse_downwards_branch_ids(&'a self, branch_id: &'a Id) -> IdsIter<Branch> {
         IdsIter {
             tree: &self.tree,
             stack: vec![&branch_id.0],
@@ -236,21 +241,21 @@ where
             .is_empty()
     }
 
-    pub fn branch_from_id_mut(&mut self, branch_id: &Id) -> &mut Branch<T> {
+    pub fn branch_from_id_mut(&mut self, branch_id: &Id) -> &mut Branch {
         self.tree
             .get_mut(&branch_id.0)
             .expect("invalid branch_id")
             .data_mut()
     }
 
-    pub fn branch_from_id(&self, branch_id: &Id) -> &Branch<T> {
+    pub fn branch_from_id(&self, branch_id: &Id) -> &Branch {
         self.tree
             .get(&branch_id.0)
             .expect("invalid branch_id")
             .data()
     }
 
-    pub fn append_branch_at(&mut self, branch: Branch<T>, as_child_of_branch_id: &Id) -> Id {
+    pub fn append_branch_at(&mut self, branch: Branch, as_child_of_branch_id: &Id) -> Id {
         assert!(
             !self.branch_from_id(&as_child_of_branch_id).is_closed(),
             "attempt to add child to closed branch"
@@ -266,6 +271,20 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::parser::{SimpleStatementLetter, Subscript};
+
+    static BRANCH_NODE_1: BranchNode = BranchNode {
+        statement: Statement::Simple(SimpleStatementLetter('A', Subscript(None))),
+        derived_from: None,
+    };
+    static BRANCH_NODE_2: BranchNode = BranchNode {
+        statement: Statement::Simple(SimpleStatementLetter('B', Subscript(None))),
+        derived_from: None,
+    };
+    static BRANCH_NODE_3: BranchNode = BranchNode {
+        statement: Statement::Simple(SimpleStatementLetter('C', Subscript(None))),
+        derived_from: None,
+    };
 
     #[test]
     fn struct_id_iter() {
@@ -292,12 +311,12 @@ mod tests {
         let mut tree = TreeBuilder::new().with_node_capacity(2).build();
 
         let root_id = tree
-            .insert(Node::new(Branch::new(vec!["Hello"])), AsRoot)
+            .insert(Node::new(Branch::new(vec![BRANCH_NODE_1.clone()])), AsRoot)
             .unwrap();
 
         let child_1_id = tree
             .insert(
-                Node::new(Branch::new(vec![", world!"])),
+                Node::new(Branch::new(vec![BRANCH_NODE_2.clone()])),
                 UnderNode(&root_id),
             )
             .unwrap();
@@ -313,7 +332,7 @@ mod tests {
 
     #[test]
     fn branch_new() {
-        let branch = Branch::new(vec!["Hello, world!", "Goodbye, world!"]);
+        let branch = Branch::new(vec![BRANCH_NODE_1.clone(), BRANCH_NODE_2.clone()]);
 
         assert!(!branch.closed, "branch was closed");
 
@@ -327,13 +346,18 @@ mod tests {
                 .children
                 .get(branch.children.root_node_id().expect("no root node"))
                 .unwrap()
-                .data(),
-            &"Hello, world!"
+                .data()
+                .statement,
+            BRANCH_NODE_1.statement
         );
 
         assert_eq!(
-            root_children_iter.next().expect("no first child").data(),
-            &"Goodbye, world!"
+            root_children_iter
+                .next()
+                .expect("no first child")
+                .data()
+                .statement,
+            BRANCH_NODE_2.statement
         );
 
         assert_eq!(root_children_iter.count(), 0); // Because id_tree::Node doesn't implement PartialEq
@@ -342,14 +366,14 @@ mod tests {
 
     #[test]
     fn branch_is_closed() {
-        let branch = Branch::new(vec!["Hello, world!"]);
+        let branch = Branch::new(vec![BRANCH_NODE_1.clone()]);
 
         assert!(!branch.is_closed(), "branch was closed");
     }
 
     #[test]
     fn branch_close() {
-        let mut branch = Branch::new(vec!["Hello, world!"]);
+        let mut branch = Branch::new(vec![BRANCH_NODE_1.clone()]);
 
         branch.close();
 
@@ -358,66 +382,74 @@ mod tests {
 
     #[test]
     fn branch_append_statement() {
-        let mut branch = Branch::new(vec!["Hello, world!"]);
+        let mut branch = Branch::new(vec![BRANCH_NODE_1.clone()]);
 
-        branch.append_statement("Goodbye, world!");
+        branch.append_statement(BRANCH_NODE_2.clone());
 
         assert_eq!(
             branch
                 .children
                 .get(&branch.statement_ids().last().unwrap().0)
                 .expect("no child")
-                .data(),
-            &"Goodbye, world!"
+                .data()
+                .statement,
+            BRANCH_NODE_2.statement
         );
     }
 
     #[test]
     fn branch_statement_ids() {
-        let branch = Branch::new(vec!["Hello, world!", "Goodbye, my lover!"]);
+        let branch = Branch::new(vec![BRANCH_NODE_1.clone(), BRANCH_NODE_2.clone()]);
 
         let mut statements_iter = branch.statement_ids();
 
         assert_eq!(
-            branch.statement_from_id(&statements_iter.next().unwrap()),
-            &"Hello, world!"
+            branch
+                .statement_from_id(&statements_iter.next().unwrap())
+                .statement,
+            BRANCH_NODE_1.statement
         );
         assert_eq!(
-            branch.statement_from_id(&statements_iter.next().unwrap()),
-            &"Goodbye, my lover!"
+            branch
+                .statement_from_id(&statements_iter.next().unwrap())
+                .statement,
+            BRANCH_NODE_2.statement
         );
         assert_eq!(statements_iter.next(), None);
     }
 
     #[test]
     fn branch_statements() {
-        let branch = Branch::new(vec!["Hello, world!", "Goodbye, my lover!"]);
+        let branch = Branch::new(vec![BRANCH_NODE_1.clone(), BRANCH_NODE_2.clone()]);
 
         let mut statements_iter = branch.statements();
 
         let (_, first_statement) = statements_iter.next().unwrap();
 
-        assert_eq!(first_statement, &"Hello, world!");
+        assert_eq!(first_statement.statement, BRANCH_NODE_1.statement);
 
         let (_, second_statement) = statements_iter.next().unwrap();
 
-        assert_eq!(second_statement, &"Goodbye, my lover!");
+        assert_eq!(second_statement.statement, BRANCH_NODE_2.statement);
 
-        assert_eq!(statements_iter.next(), None);
+        assert_eq!(statements_iter.count(), 0); // equivalent to next() == None
     }
 
     #[test]
     fn branch_statement_from_id() {
-        let branch = Branch::new(vec!["Hello, world!"]);
+        let branch = Branch::new(vec![BRANCH_NODE_1.clone()]);
 
         let root_id = branch.statement_ids().next().unwrap();
 
-        assert_eq!(branch.statement_from_id(&root_id), &"Hello, world!");
+        assert_eq!(
+            branch.statement_from_id(&root_id).statement,
+            BRANCH_NODE_1.statement
+        );
     }
 
     #[test]
     fn statement_tree_main_trunk_id() {
-        let statement_tree = TruthTree::new(Branch::new(vec!["Hello!"]));
+        let statement_tree = TruthTree::new(Branch::new(vec![BRANCH_NODE_1.clone()]));
 
         let root_id = statement_tree.main_trunk_id();
 
@@ -429,12 +461,12 @@ mod tests {
 
     #[test]
     fn statement_tree_traverse_upwards_branch_ids() {
-        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec![BRANCH_NODE_1.clone()]));
 
         let root_id = statement_tree.main_trunk_id();
 
         let child_branch_1_id =
-            statement_tree.append_branch_at(Branch::new(vec![", world!"]), &root_id);
+            statement_tree.append_branch_at(Branch::new(vec![BRANCH_NODE_2.clone()]), &root_id);
 
         let mut iter = statement_tree.traverse_upwards_branch_ids(&child_branch_1_id);
 
@@ -445,27 +477,31 @@ mod tests {
 
     #[test]
     fn statement_tree_traverse_upwards_branches() {
-        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec![BRANCH_NODE_1.clone()]));
 
         let root_id = statement_tree.main_trunk_id();
 
         let child_branch_1_id =
-            statement_tree.append_branch_at(Branch::new(vec![", world!"]), &root_id);
+            statement_tree.append_branch_at(Branch::new(vec![BRANCH_NODE_2.clone()]), &root_id);
 
         let mut iter = statement_tree.traverse_upwards_branches(&child_branch_1_id);
 
         let (_, first_branch) = iter.next().unwrap();
 
         assert_eq!(
-            first_branch.statement_from_id(&first_branch.statement_ids().next().unwrap()),
-            &", world!"
+            first_branch
+                .statement_from_id(&first_branch.statement_ids().next().unwrap())
+                .statement,
+            BRANCH_NODE_2.statement
         );
 
         let (_, second_branch) = iter.next().unwrap();
 
         assert_eq!(
-            second_branch.statement_from_id(&second_branch.statement_ids().next().unwrap()),
-            &"Hello"
+            second_branch
+                .statement_from_id(&second_branch.statement_ids().next().unwrap())
+                .statement,
+            BRANCH_NODE_1.statement
         );
 
         match iter.next() {
@@ -476,15 +512,15 @@ mod tests {
 
     #[test]
     fn statement_tree_traverse_downwards_branch_ids() {
-        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec![BRANCH_NODE_1.clone()]));
 
         let root_id = statement_tree.main_trunk_id();
 
         let child_branch_1_id =
-            statement_tree.append_branch_at(Branch::new(vec![", world!"]), &root_id);
+            statement_tree.append_branch_at(Branch::new(vec![BRANCH_NODE_2.clone()]), &root_id);
 
         let child_branch_2_id = statement_tree
-            .append_branch_at(Branch::new(vec!["Goodbye, my lover!"]), &child_branch_1_id);
+            .append_branch_at(Branch::new(vec![BRANCH_NODE_3.clone()]), &child_branch_1_id);
 
         let mut iter = statement_tree.traverse_downwards_branch_ids(&root_id);
 
@@ -496,15 +532,15 @@ mod tests {
 
     #[test]
     fn statement_tree_traverse_branch_immediate_children_ids() {
-        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec![BRANCH_NODE_1.clone()]));
 
         let root_id = statement_tree.main_trunk_id();
 
         let child_branch_1_id =
-            statement_tree.append_branch_at(Branch::new(vec![", world!"]), &root_id);
+            statement_tree.append_branch_at(Branch::new(vec![BRANCH_NODE_2.clone()]), &root_id);
 
         statement_tree
-            .append_branch_at(Branch::new(vec!["Goodbye, my lover!"]), &child_branch_1_id);
+            .append_branch_at(Branch::new(vec![BRANCH_NODE_3.clone()]), &child_branch_1_id);
 
         let mut iter = statement_tree.traverse_branch_immediate_children_ids(&root_id);
 
@@ -514,12 +550,12 @@ mod tests {
 
     #[test]
     fn statement_tree_branch_is_last_child() {
-        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec![BRANCH_NODE_1.clone()]));
 
         let root_id = statement_tree.main_trunk_id();
 
         let child_branch_1_id =
-            statement_tree.append_branch_at(Branch::new(vec![", world!"]), &root_id);
+            statement_tree.append_branch_at(Branch::new(vec![BRANCH_NODE_2.clone()]), &root_id);
 
         assert!(
             !statement_tree.branch_is_last_child(&root_id),
@@ -534,29 +570,33 @@ mod tests {
 
     #[test]
     fn statement_tree_branch_from_id_mut() {
-        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec![BRANCH_NODE_1.clone()]));
 
         let root_id = statement_tree.main_trunk_id();
 
         let branch = statement_tree.branch_from_id_mut(&root_id);
 
-        branch.append_statement(", world!");
+        branch.append_statement(BRANCH_NODE_2.clone());
 
         let mut statements_iter = branch.statement_ids();
 
         assert_eq!(
-            branch.statement_from_id(&statements_iter.next().unwrap()),
-            &"Hello"
+            branch
+                .statement_from_id(&statements_iter.next().unwrap())
+                .statement,
+            BRANCH_NODE_1.statement
         );
         assert_eq!(
-            branch.statement_from_id(&statements_iter.next().unwrap()),
-            &", world!"
+            branch
+                .statement_from_id(&statements_iter.next().unwrap())
+                .statement,
+            BRANCH_NODE_2.statement
         );
     }
 
     #[test]
     fn statement_tree_branch_from_id() {
-        let statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
+        let statement_tree = TruthTree::new(Branch::new(vec![BRANCH_NODE_1.clone()]));
 
         let root_id = statement_tree.main_trunk_id();
 
@@ -564,17 +604,20 @@ mod tests {
 
         let first_statement_id = branch.statement_ids().next().unwrap();
 
-        assert_eq!(branch.statement_from_id(&first_statement_id), &"Hello");
+        assert_eq!(
+            branch.statement_from_id(&first_statement_id).statement,
+            BRANCH_NODE_1.statement
+        );
     }
 
     #[test]
     fn statement_tree_append_branch_at() {
-        let mut statement_tree = TruthTree::new(Branch::new(vec!["Hello"]));
+        let mut statement_tree = TruthTree::new(Branch::new(vec![BRANCH_NODE_1.clone()]));
 
         let root_id = statement_tree.main_trunk_id();
 
         let child_branch_1_id =
-            statement_tree.append_branch_at(Branch::new(vec![", world!"]), &root_id);
+            statement_tree.append_branch_at(Branch::new(vec![BRANCH_NODE_2.clone()]), &root_id);
 
         let mut iter = statement_tree.traverse_downwards_branch_ids(&root_id);
 

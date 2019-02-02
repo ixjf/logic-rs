@@ -78,18 +78,8 @@ struct RuleDeriveResult {
     whatdo: DerivedRuleWhatdo,
 }
 
-// FIXME Maybe this should be in truth_tree.rs?
-#[derive(Clone, Debug)]
-pub struct TreeNodeLocation(pub Id, pub Id); // Statement ID, Branch ID
-
-#[derive(Clone, Debug)]
-pub struct TreeNode {
-    pub statement: Statement,
-    pub derived_from: Option<(TreeNodeLocation, Rule)>,
-}
-
 pub struct TruthTreeMethod {
-    tree: TruthTree<TreeNode>,
+    tree: TruthTree,
 }
 
 impl TruthTreeMethod {
@@ -98,7 +88,7 @@ impl TruthTreeMethod {
             tree: TruthTree::new(Branch::new(
                 statements
                     .iter()
-                    .map(|x| TreeNode {
+                    .map(|x| BranchNode {
                         statement: x.clone(),
                         derived_from: None,
                     })
@@ -107,7 +97,7 @@ impl TruthTreeMethod {
         }
     }
 
-    pub fn compute(mut self) -> TruthTree<TreeNode> {
+    pub fn compute(mut self) -> TruthTree {
         let mut queue = BinaryHeap::new();
 
         // Populate the queue with the main trunk
@@ -172,10 +162,10 @@ impl TruthTreeMethod {
                                         let new_statement_id = self
                                             .tree
                                             .branch_from_id_mut(&child_branch_id)
-                                            .append_statement(TreeNode {
+                                            .append_statement(BranchNode {
                                                 statement: x.clone(),
                                                 derived_from: Some((
-                                                    TreeNodeLocation(
+                                                    BranchNodeLocation(
                                                         statement_id.clone(),
                                                         branch_id.clone(),
                                                     ),
@@ -188,10 +178,10 @@ impl TruthTreeMethod {
                                     DerivedRuleWhatdo::AsNewBranches => {
                                         // Each derived statement will create a new child branch on every open
                                         // branch of branch_id that is at the end of the tree
-                                        let new_branch = Branch::new(vec![TreeNode {
+                                        let new_branch = Branch::new(vec![BranchNode {
                                             statement: x.clone(),
                                             derived_from: Some((
-                                                TreeNodeLocation(
+                                                BranchNodeLocation(
                                                     statement_id.clone(),
                                                     branch_id.clone(),
                                                 ),
@@ -219,17 +209,6 @@ impl TruthTreeMethod {
                                 branch_id: derived_statement_branch_id.clone(),
                             };
                             queue.push(new_node);
-
-                            /*
-                            // If the statement contradicts another in derived_statement_branch_id or
-                            // any of its parents, keep the statement in the branch
-                            // but close it and move on to the next one
-                            if self.statement_is_contradiction(&x, &derived_statement_branch_id) {
-                                self.tree
-                                    .branch_from_id_mut(&derived_statement_branch_id)
-                                    .close();
-                                break;
-                            }*/
                         }
                     }
                 }
@@ -733,11 +712,16 @@ impl TruthTreeMethod {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::{Degree, PredicateLetter, SimpleStatementLetter, SingularTerm, Subscript};
+    use crate::parser::{
+        Degree, PredicateLetter, SimpleStatementLetter, SingularTerm, Statement, Subscript,
+    };
 
     #[test]
     fn queue_node_priority_order_correct() {
-        let branch = Branch::new(vec!["mock"]);
+        let branch = Branch::new(vec![BranchNode {
+            statement: Statement::Simple(SimpleStatementLetter('A', Subscript(None))),
+            derived_from: None,
+        }]);
         let mock_id = branch.statement_ids().next().unwrap();
         let mock_statement = Statement::Simple(SimpleStatementLetter('A', Subscript(None)));
 
