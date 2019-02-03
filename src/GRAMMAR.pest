@@ -1,4 +1,7 @@
 // TODO: Support for groupers, somehow clean this up, merging formula with statement
+// Do not allow retrieving the intermediate ParseTrees, because why the hell should
+// the user have it, eliminating the possibility of the truth tree algorithm
+// receiving invalid input
 
 // This specification does not take into account these:
 // 1. Degree of predicate matching number of terms
@@ -141,8 +144,6 @@ singular_term = ${
 variable_alpha = { 'x'..'z' }
 variable = ${ variable_alpha ~ subscript_number? }
 
-// term = { singular_term | variable }
-
 superscript_number = @{ 
     !"\u{2070}" ~ (
         ("\u{00B9}" | '\u{00B2}'..'\u{00B3}' | '\u{2074}'..'\u{2079}')+ ~ 
@@ -158,58 +159,16 @@ predicate_letter = ${
 
 singular_statement = ${ predicate_letter ~ singular_term+ }
 
-//predicate = { compound_predicate | simple_predicate }
-
 simple_predicate = ${ 
     predicate_letter ~ 
     (singular_term* ~ variable ~ singular_term*)+ 
 }
-
-//conjunctive_predicate = { 
-//    grouper_opening ~ 
-//    predicate ~
-    //(predicate | existential_statement | universal_statement) ~ 
-//    conjunction_connective ~ 
-//    predicate ~
-    //(predicate | existential_statement | universal_statement) ~ 
-//    grouper_closing 
-//}
-//negative_predicate = {
-//    negation_connective ~ 
-    // (predicate | existential_statement | universal_statement)
-//    predicate
-//}
-//disjunctive_predicate = {
-//    grouper_opening ~ 
-    // (predicate | existential_statement | universal_statement) ~ 
-//    predicate ~
-//    disjunction_connective ~ 
-    // (predicate | existential_statement | universal_statement) ~ 
-//    predicate ~
-//    grouper_closing
-//}
-//conditional_predicate = {
-//    grouper_opening ~ 
-    // (predicate | existential_statement | universal_statement) ~ 
-//    predicate ~
-//    conditional_connective ~ 
-    // (predicate | existential_statement | universal_statement) ~ 
-//    predicate ~
-//    grouper_closing
-//}
-//compound_predicate = { 
-//    conjunctive_predicate |
-//    negative_predicate |
-//    disjunctive_predicate |
-//    conditional_predicate
-//}
 
 existential_quantifier = _{ "\u{2203}" }
 existential_statement = { 
     existential_quantifier ~ 
     variable ~ 
     formula
-    //predicate 
 }
 
 universal_quantifier = _{ "\u{2200}" }
@@ -217,5 +176,4 @@ universal_statement = {
     universal_quantifier ~ 
     variable ~ 
     formula
-    //predicate 
 }

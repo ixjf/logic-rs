@@ -634,6 +634,11 @@ impl TruthTreeMethod {
                 // If the root is a predicate, and we know there can't be
                 // free variables, then we can safely transform this into
                 // a singular statement.
+                // We can be certain that if Formula::Predicate appears, then
+                // it's at the root, since any Formula::Predicate that doesn't
+                // appear at the root can only appear in a quantified
+                // statement, but these two cases are handled in Formula::Statement
+                // below
                 Statement::Singular(
                     pred_letter.clone(),
                     terms

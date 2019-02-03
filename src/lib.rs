@@ -4,5 +4,5 @@ extern crate pest_derive;
 
 extern crate id_tree;
 
-pub mod parser;
-pub mod validity;
+mod parser;
+mod validity;

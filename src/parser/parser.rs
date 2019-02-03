@@ -1,131 +1,10 @@
-// TODO: Maybe semantic checks should be impl for the following types?
-// And they're pub(in parser)
-use std::fmt;
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Subscript(pub Option<u64>);
-
-impl PartialEq<u64> for Subscript {
-    fn eq(&self, rhs: &u64) -> bool {
-        match self.0 {
-            Some(ref lhs) => lhs == rhs,
-            None => false,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SimpleStatementLetter(pub char, pub Subscript);
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct SingularTerm(pub char, pub Subscript);
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Variable(pub char, pub Subscript);
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct Degree(pub u64);
-
-impl PartialEq<u64> for Degree {
-    fn eq(&self, rhs: &u64) -> bool {
-        self.0 == *rhs
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct PredicateLetter(pub char, pub Subscript, pub Degree);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Input {
-    StatementSet(Vec<Statement>),
-    Argument(Vec<Statement>, Statement),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParseTree(pub Input);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Term {
-    SingularTerm(SingularTerm),
-    Variable(Variable),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Statement {
-    Simple(SimpleStatementLetter),
-    Singular(PredicateLetter, Vec<SingularTerm>),
-    LogicalConjunction(Box<Statement>, Box<Statement>),
-    LogicalNegation(Box<Statement>),
-    LogicalDisjunction(Box<Statement>, Box<Statement>),
-    LogicalConditional(Box<Statement>, Box<Statement>),
-    Existential(Variable, Box<Formula>),
-    Universal(Variable, Box<Formula>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Formula {
-    Statement(Box<Statement>),
-    Predicate(PredicateLetter, Vec<Term>),
-    Conjunction(Box<Formula>, Box<Formula>),
-    Negation(Box<Formula>),
-    Disjunction(Box<Formula>, Box<Formula>),
-    Conditional(Box<Formula>, Box<Formula>),
-}
-
-mod pest_parser {
-    use pest::Parser;
-
-    #[derive(Parser)]
-    #[grammar = "GRAMMAR.pest"]
-    pub struct GeneratedParser;
-}
-
-use self::pest_parser::Rule;
-use pest::error::Error as pest_error;
-use pest::error::ErrorVariant as pest_error_variant;
+use super::ast::{
+    Degree, Formula, Input, ParseTree, PredicateLetter, SimpleStatementLetter, SingularTerm,
+    Statement, Subscript, Term, Variable,
+};
+use super::error::Error;
+use super::pest_parser::{GeneratedParser, Rule};
 use pest::iterators::{Pair, Pairs};
-use pest::Span;
-
-pub struct Error {
-    pub location: (usize, usize),
-    decorated_message: String,
-}
-
-impl Error {
-    pub(in crate::parser) fn new_from_custom_error(span: Span, decorated_message: &str) -> Self {
-        let e: pest_error<Rule> = pest_error::new_from_span(
-            pest_error_variant::CustomError {
-                message: decorated_message.to_owned(),
-            },
-            span.clone(),
-        );
-
-        Error {
-            location: span.start_pos().line_col(),
-            decorated_message: format!("{}", e),
-        }
-    }
-
-    pub(in crate::parser) fn new_from_parsing_error(e: pest_error<Rule>) -> Error {
-        use pest::error::LineColLocation;
-
-        let location = match e.line_col {
-            LineColLocation::Pos((line, col)) => (line, col),
-            _ => unreachable!(), // is this actually unreachable? it's not documented
-        };
-
-        Error {
-            location,
-            decorated_message: format!("{}", e),
-        }
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.decorated_message)
-    }
-}
 
 pub struct Parser {}
 
@@ -137,7 +16,7 @@ impl Parser {
     pub fn parse<'a>(&self, input: &'a str) -> Result<ParseTree, Error> {
         use pest::Parser;
 
-        match pest_parser::GeneratedParser::parse(Rule::input, input) {
+        match GeneratedParser::parse(Rule::input, input) {
             Ok(p) => self.into_ast(p),
             Err(e) => Err(Error::new_from_parsing_error(e)),
         }
@@ -656,6 +535,7 @@ impl Parser {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use pest::Span;
 
     #[test]
     fn custom_error_provides_correct_location_info() {
@@ -673,7 +553,7 @@ mod tests {
                 Input::StatementSet(_) => {}
                 _ => assert!(false),
             },
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         };
     }
 
@@ -686,7 +566,7 @@ mod tests {
                 Input::Argument(_, _) => {}
                 _ => assert!(false),
             },
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
@@ -708,7 +588,7 @@ mod tests {
                 }
                 _ => assert!(false),
             },
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
@@ -730,7 +610,7 @@ mod tests {
                 }
                 _ => assert!(false),
             },
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
@@ -752,7 +632,7 @@ mod tests {
                 }
                 _ => assert!(false),
             },
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
@@ -774,7 +654,7 @@ mod tests {
                 }
                 _ => assert!(false),
             },
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
@@ -796,7 +676,7 @@ mod tests {
                 }
                 _ => assert!(false),
             },
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
@@ -838,7 +718,7 @@ mod tests {
                 }
                 _ => assert!(false),
             },
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
@@ -860,7 +740,7 @@ mod tests {
                 }
                 _ => assert!(false),
             },
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
@@ -885,7 +765,7 @@ mod tests {
                 }
                 _ => assert!(false),
             },
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
@@ -905,7 +785,7 @@ mod tests {
 
         match parser.parse("{∀z(A¹z & A²za)}") {
             Ok(_) => {}
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
@@ -915,7 +795,7 @@ mod tests {
 
         match parser.parse("{∀x((A¹x & B¹x) ⊃ ∀y((~C¹y) ⊃ ∃z(A²zy & B¹z)))}") {
             Ok(_) => {}
-            Err(e) => assert!(false, e.decorated_message),
+            Err(e) => assert!(false, format!("{}", e)),
         }
     }
 
