@@ -1,5 +1,4 @@
 // TODO: Support for groupers, somehow clean this up, merging formula with statement
-// Add proper tests for algorithm.rs
 
 // This specification does not take into account these:
 // 1. Degree of predicate matching number of terms

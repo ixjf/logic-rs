@@ -14,6 +14,7 @@ use validity::TruthTreeMethod;
 
 pub use validity::TruthTree;
 
+// An empty string will lead to a parse error
 pub fn validate(input: &str) -> Result<TruthTree, Error> {
     let parser = Parser::new();
 
