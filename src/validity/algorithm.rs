@@ -1,5 +1,5 @@
 use super::truth_tree::*;
-use crate::parser::{Predicate, SingularTerm, Statement, Subscript, Term, Variable};
+use crate::parser::{Formula, SingularTerm, Statement, Subscript, Term, Variable};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 
@@ -175,6 +175,7 @@ impl TruthTreeMethod {
 
                                         (new_statement_id, child_branch_id.clone())
                                     }
+
                                     DerivedRuleWhatdo::AsNewBranches => {
                                         // Each derived statement will create a new child branch on every open
                                         // branch of branch_id that is at the end of the tree
@@ -389,17 +390,17 @@ impl TruthTreeMethod {
     fn apply_qe_rule(&self, statement: &Statement) -> RuleDeriveResult {
         match statement {
             Statement::LogicalNegation(ref rst) => match **rst {
-                Statement::Existential(ref var, ref pred) => RuleDeriveResult {
+                Statement::Existential(ref var, ref formula) => RuleDeriveResult {
                     statements: vec![Statement::Universal(
                         var.clone(),
-                        Predicate::Negative(Box::new(pred.clone())),
+                        Box::new(Formula::Negation(Box::new(*formula.clone()))),
                     )],
                     whatdo: DerivedRuleWhatdo::AddToExistingBranches,
                 },
-                Statement::Universal(ref var, ref pred) => RuleDeriveResult {
+                Statement::Universal(ref var, ref formula) => RuleDeriveResult {
                     statements: vec![Statement::Existential(
                         var.clone(),
-                        Predicate::Negative(Box::new(pred.clone())),
+                        Box::new(Formula::Negation(Box::new(*formula.clone()))),
                     )],
                     whatdo: DerivedRuleWhatdo::AddToExistingBranches,
                 },
@@ -411,10 +412,9 @@ impl TruthTreeMethod {
 
     fn apply_eq_rule(&self, statement: &Statement, branch_id: &Id) -> RuleDeriveResult {
         match statement {
-            Statement::Existential(ref var, ref pred) => RuleDeriveResult {
+            Statement::Existential(_, _) => RuleDeriveResult {
                 statements: vec![self.instantiate_quantified_statement(
-                    &pred,
-                    &var,
+                    &statement,
                     &self.first_unused_in_singular_term_stack(
                         &self.build_singular_term_stack_for_branch(&branch_id),
                     ),
@@ -427,7 +427,7 @@ impl TruthTreeMethod {
 
     fn apply_uq_rule(&self, statement: &Statement, branch_id: &Id) -> RuleDeriveResult {
         match statement {
-            Statement::Universal(ref var, ref pred) => {
+            Statement::Universal(_, _) => {
                 // Build a list of all singular terms which we haven't instantiated
                 // this universal statement to yet
                 //
@@ -443,7 +443,7 @@ impl TruthTreeMethod {
                         .cloned()
                         .filter(|x| {
                             let instantiated_statement =
-                                self.instantiate_quantified_statement(&pred, &var, &x);
+                                self.instantiate_quantified_statement(&statement, &x);
 
                             for (_, ancestor_branch) in
                                 self.tree.traverse_upwards_branches(&branch_id)
@@ -463,7 +463,7 @@ impl TruthTreeMethod {
                 RuleDeriveResult {
                     statements: new_singular_terms
                         .iter()
-                        .map(|x| self.instantiate_quantified_statement(&pred, &var, &x))
+                        .map(|x| self.instantiate_quantified_statement(&statement, &x))
                         .collect(),
                     whatdo: DerivedRuleWhatdo::AddToExistingBranches,
                 }
@@ -597,20 +597,16 @@ impl TruthTreeMethod {
             Statement::LogicalNegation(ref rst) => {
                 self.find_singular_terms_in_statement(&mut stack, &rst)
             }
-            Statement::Existential(_, ref pred) | Statement::Universal(_, ref pred) => {
-                self.find_singular_terms_in_predicate(&mut stack, &pred)
+            Statement::Existential(_, ref formula) | Statement::Universal(_, ref formula) => {
+                self.find_singular_terms_in_formula(&mut stack, &formula)
             }
             _ => {}
         }
     }
 
-    fn find_singular_terms_in_predicate(
-        &self,
-        mut stack: &mut Vec<SingularTerm>,
-        pred: &Predicate,
-    ) {
-        match pred {
-            Predicate::Simple(_, ref terms) => terms.iter().for_each(|t| match t {
+    fn find_singular_terms_in_formula(&self, mut stack: &mut Vec<SingularTerm>, formula: &Formula) {
+        match formula {
+            Formula::Predicate(_, ref terms) => terms.iter().for_each(|t| match t {
                 Term::SingularTerm(ref singular_term) => {
                     if !stack.contains(singular_term) {
                         stack.push(singular_term.clone());
@@ -618,55 +614,221 @@ impl TruthTreeMethod {
                 }
                 _ => {}
             }),
-            Predicate::Conjunctive(ref lpred, ref rpred)
-            | Predicate::Disjunctive(ref lpred, ref rpred)
-            | Predicate::Conditional(ref lpred, ref rpred) => {
-                self.find_singular_terms_in_predicate(&mut stack, &lpred);
-                self.find_singular_terms_in_predicate(&mut stack, &rpred);
+            Formula::Statement(ref st) => self.find_singular_terms_in_statement(&mut stack, &st),
+            Formula::Conjunction(ref lformula, ref rformula)
+            | Formula::Disjunction(ref lformula, ref rformula)
+            | Formula::Conditional(ref lformula, ref rformula) => {
+                self.find_singular_terms_in_formula(&mut stack, &lformula);
+                self.find_singular_terms_in_formula(&mut stack, &rformula);
             }
-            Predicate::Negative(rpred) => {
-                self.find_singular_terms_in_predicate(&mut stack, &rpred);
+            Formula::Negation(ref rformula) => {
+                self.find_singular_terms_in_formula(&mut stack, &rformula);
             }
+        }
+    }
+
+    fn instantiation_transform_into_statement(&self, formula: &Formula) -> Statement {
+        // See instantiate_quantified_statement for details
+        match formula {
+            Formula::Predicate(ref pred_letter, ref terms) => {
+                // If the root is a predicate, and we know there can't be
+                // free variables, then we can safely transform this into
+                // a singular statement.
+                Statement::Singular(
+                    pred_letter.clone(),
+                    terms
+                        .iter()
+                        .map(|x| match x {
+                            Term::SingularTerm(t) => t.clone(),
+                            Term::Variable(_) => {
+                                panic!("variable at root of instantiated quantified statement")
+                            }
+                        })
+                        .collect(),
+                )
+            }
+            Formula::Conjunction(ref lformula, ref rformula) => Statement::LogicalConjunction(
+                Box::new(self.instantiation_transform_into_statement(&*lformula.clone())),
+                Box::new(self.instantiation_transform_into_statement(&*rformula.clone())),
+            ),
+            Formula::Negation(ref rformula) => Statement::LogicalNegation(Box::new(
+                self.instantiation_transform_into_statement(&*rformula.clone()),
+            )),
+            Formula::Disjunction(ref lformula, ref rformula) => Statement::LogicalDisjunction(
+                Box::new(self.instantiation_transform_into_statement(&*lformula.clone())),
+                Box::new(self.instantiation_transform_into_statement(&*rformula.clone())),
+            ),
+            Formula::Conditional(ref lformula, ref rformula) => Statement::LogicalConditional(
+                Box::new(self.instantiation_transform_into_statement(&*lformula.clone())),
+                Box::new(self.instantiation_transform_into_statement(&*rformula.clone())),
+            ),
+            Formula::Statement(ref st) => *st.clone(), // An existential or universal statement
+        }
+    }
+
+    fn instantiation_replace_in_formula(
+        &self,
+        formula: &Formula,
+        var: &Variable,
+        replace_with: &SingularTerm,
+    ) -> Formula {
+        // Replaces all occurrences of 'var' with 'replace_with' but leaves everything
+        // else as-is
+        match formula {
+            Formula::Predicate(ref pred_letter, ref terms) => {
+                let terms = terms
+                    .iter()
+                    .map(|x| match x {
+                        Term::Variable(ref v) => {
+                            if v == var {
+                                Term::SingularTerm(replace_with.clone())
+                            } else {
+                                Term::Variable(v.clone())
+                            }
+                        }
+                        t @ Term::SingularTerm(_) => t.clone(),
+                    })
+                    .collect();
+
+                Formula::Predicate(pred_letter.clone(), terms)
+            }
+            Formula::Conjunction(ref lformula, ref rformula) => Formula::Conjunction(
+                Box::new(self.instantiation_replace_in_formula(
+                    &*lformula.clone(),
+                    &var,
+                    &replace_with,
+                )),
+                Box::new(self.instantiation_replace_in_formula(
+                    &*rformula.clone(),
+                    &var,
+                    &replace_with,
+                )),
+            ),
+            Formula::Negation(ref rformula) => Formula::Negation(Box::new(
+                self.instantiation_replace_in_formula(&*rformula.clone(), &var, &replace_with),
+            )),
+            Formula::Disjunction(ref lformula, ref rformula) => Formula::Disjunction(
+                Box::new(self.instantiation_replace_in_formula(
+                    &*lformula.clone(),
+                    &var,
+                    &replace_with,
+                )),
+                Box::new(self.instantiation_replace_in_formula(
+                    &*rformula.clone(),
+                    &var,
+                    &replace_with,
+                )),
+            ),
+            Formula::Conditional(ref lformula, ref rformula) => Formula::Conditional(
+                Box::new(self.instantiation_replace_in_formula(
+                    &*lformula.clone(),
+                    &var,
+                    &replace_with,
+                )),
+                Box::new(self.instantiation_replace_in_formula(
+                    &*rformula.clone(),
+                    &var,
+                    &replace_with,
+                )),
+            ),
+            Formula::Statement(ref statement) => match **statement {
+                Statement::Simple(_) | Statement::Singular(_, _) => {
+                    Formula::Statement(Box::new(*statement.clone()))
+                }
+                Statement::LogicalConjunction(ref lst, ref rst) => Formula::Conjunction(
+                    Box::new(self.instantiation_replace_in_formula(
+                        &Formula::Statement(lst.clone()),
+                        &var,
+                        &replace_with,
+                    )),
+                    Box::new(self.instantiation_replace_in_formula(
+                        &Formula::Statement(rst.clone()),
+                        &var,
+                        &replace_with,
+                    )),
+                ),
+                Statement::LogicalNegation(ref rst) => {
+                    Formula::Negation(Box::new(self.instantiation_replace_in_formula(
+                        &Formula::Statement(rst.clone()),
+                        &var,
+                        &replace_with,
+                    )))
+                }
+                Statement::LogicalDisjunction(ref lst, ref rst) => Formula::Disjunction(
+                    Box::new(self.instantiation_replace_in_formula(
+                        &Formula::Statement(lst.clone()),
+                        &var,
+                        &replace_with,
+                    )),
+                    Box::new(self.instantiation_replace_in_formula(
+                        &Formula::Statement(rst.clone()),
+                        &var,
+                        &replace_with,
+                    )),
+                ),
+                Statement::LogicalConditional(ref lst, ref rst) => Formula::Conditional(
+                    Box::new(self.instantiation_replace_in_formula(
+                        &Formula::Statement(lst.clone()),
+                        &var,
+                        &replace_with,
+                    )),
+                    Box::new(self.instantiation_replace_in_formula(
+                        &Formula::Statement(rst.clone()),
+                        &var,
+                        &replace_with,
+                    )),
+                ),
+                Statement::Existential(ref var_pls_dont_shadow, ref formula) => {
+                    Formula::Statement(Box::new(Statement::Existential(
+                        var_pls_dont_shadow.clone(),
+                        Box::new(self.instantiation_replace_in_formula(
+                            &formula,
+                            &var,
+                            &replace_with,
+                        )),
+                    )))
+                }
+                Statement::Universal(ref var_pls_dont_shadow, ref formula) => {
+                    Formula::Statement(Box::new(Statement::Universal(
+                        var_pls_dont_shadow.clone(),
+                        Box::new(self.instantiation_replace_in_formula(
+                            &formula,
+                            &var,
+                            &replace_with,
+                        )),
+                    )))
+                }
+            },
         }
     }
 
     fn instantiate_quantified_statement(
         &self,
-        pred: &Predicate,
-        var: &Variable,
+        statement: &Statement,
         replace_with: &SingularTerm,
     ) -> Statement {
-        match pred {
-            Predicate::Simple(ref pred_letter, ref terms) => {
-                let singular_terms = terms
-                    .iter()
-                    .map(|x| match x {
-                        Term::Variable(ref v) => {
-                            if v != var {
-                                panic!("unknown variable in quantified statement")
-                            }
-                            replace_with.clone()
-                        }
-                        Term::SingularTerm(ref t) => t.clone(),
-                    })
-                    .collect::<Vec<SingularTerm>>();
-
-                Statement::Singular(pred_letter.clone(), singular_terms)
-            }
-            Predicate::Conjunctive(ref lpred, ref rpred) => Statement::LogicalConjunction(
-                Box::new(self.instantiate_quantified_statement(&lpred, &var, &replace_with)),
-                Box::new(self.instantiate_quantified_statement(&rpred, &var, &replace_with)),
-            ),
-            Predicate::Negative(ref rpred) => Statement::LogicalNegation(Box::new(
-                self.instantiate_quantified_statement(&rpred, &var, &replace_with),
-            )),
-            Predicate::Disjunctive(ref lpred, ref rpred) => Statement::LogicalDisjunction(
-                Box::new(self.instantiate_quantified_statement(&lpred, &var, &replace_with)),
-                Box::new(self.instantiate_quantified_statement(&rpred, &var, &replace_with)),
-            ),
-            Predicate::Conditional(ref lpred, ref rpred) => Statement::LogicalConditional(
-                Box::new(self.instantiate_quantified_statement(&lpred, &var, &replace_with)),
-                Box::new(self.instantiate_quantified_statement(&rpred, &var, &replace_with)),
+        // In order to instantiate a quantified statement, we take
+        // the variable it binds to and replace it everywhere in the statement
+        // with an instantiation of a singular term type.
+        // A quantified statement's inner formula can be made, at the very root,
+        // of either predicates or statements. Assuming a valid input, free
+        // variables cannot appear, hence any predicate within a formula either
+        // becomes a singular statement (it's at the root and its only terms that are
+        // variables are our quantifier's variable) or a predicate that is enclosed
+        // within another quantified statement in this formula.
+        // This is to say that the instantiated formula of a quantified statement
+        // also HAS to be a statement.
+        match statement {
+            Statement::Existential(ref var, ref formula)
+            | Statement::Universal(ref var, ref formula) => self
+                .instantiation_transform_into_statement(&self.instantiation_replace_in_formula(
+                    &formula,
+                    &var,
+                    &replace_with,
+                )),
+            _ => panic!(
+                "called instantiated_quantified_statement\
+                 with non-quantified statement"
             ),
         }
     }
@@ -690,18 +852,12 @@ impl TruthTreeMethod {
         }
 
         for subscript in 1.. {
-            // This subscript is not used by this x
-            // And there isn't some x further in the stack with the same character
-            // and the subscript we want
-            match stack.iter().find_map(|x| {
-                if x.1 != subscript && !stack.iter().any(|y| x.0 == y.0 && y.1 == subscript) {
-                    Some(x)
-                } else {
-                    None
+            for c in 'a' as u8..='w' as u8 {
+                if !stack.iter().any(|x| match x {
+                    SingularTerm(a, b) => *a == c as char && b.0 == Some(subscript),
+                }) {
+                    return SingularTerm(c as char, Subscript(Some(subscript)));
                 }
-            }) {
-                Some(s) => return SingularTerm(s.0, Subscript(Some(subscript))),
-                None => {}
             }
         }
 
@@ -860,4 +1016,61 @@ mod tests {
             }
         }
     }*/
+
+    #[test]
+    fn instantiate_quantified_statement() {
+        // Quantified statement: ∀x((A¹x & B¹x) ⊃ ∀y((~C¹y) ⊃ ∃z(A²zy & B²zx)))
+        // After instantiation:     (A¹a & B¹a) ⊃ ∀y((~C¹y) ⊃ ∃z(A²zy & B²za))
+        let statement = Statement::Universal(
+            Variable('x', Subscript(None)),
+            Box::new(Formula::Conditional(
+                Box::new(Formula::Conjunction(
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('A', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('B', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                )),
+                Box::new(Formula::Statement(Box::new(Statement::Universal(
+                    Variable('y', Subscript(None)),
+                    Box::new(Formula::Conditional(
+                        Box::new(Formula::Negation(Box::new(Formula::Predicate(
+                            PredicateLetter('C', Subscript(None), Degree(1)),
+                            vec![Term::Variable(Variable('y', Subscript(None)))],
+                        )))),
+                        Box::new(Formula::Statement(Box::new(Statement::Existential(
+                            Variable('z', Subscript(None)),
+                            Box::new(Formula::Conjunction(
+                                Box::new(Formula::Predicate(
+                                    PredicateLetter('A', Subscript(None), Degree(2)),
+                                    vec![
+                                        Term::Variable(Variable('z', Subscript(None))),
+                                        Term::Variable(Variable('y', Subscript(None))),
+                                    ],
+                                )),
+                                Box::new(Formula::Predicate(
+                                    PredicateLetter('B', Subscript(None), Degree(2)),
+                                    vec![
+                                        Term::Variable(Variable('z', Subscript(None))),
+                                        Term::Variable(Variable('x', Subscript(None))),
+                                    ],
+                                )),
+                            )),
+                        )))),
+                    )),
+                )))),
+            )),
+        );
+
+        let truth_tree = TruthTreeMethod::new(&vec![statement.clone()]);
+
+        println!(
+            "{:#?}",
+            truth_tree
+                .instantiate_quantified_statement(&statement, &SingularTerm('a', Subscript(None)))
+        );
+    }
 }

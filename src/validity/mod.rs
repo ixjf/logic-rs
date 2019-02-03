@@ -109,7 +109,7 @@ fn is_consistent(truth_tree: &TruthTree) -> bool {
 mod tests {
     use super::*;
     use crate::parser::{
-        Degree, Predicate, PredicateLetter, SimpleStatementLetter, SingularTerm, Statement,
+        Degree, Formula, PredicateLetter, SimpleStatementLetter, SingularTerm, Statement,
         Subscript, Term, Variable,
     };
 
@@ -191,29 +191,29 @@ mod tests {
                 ),
                 Statement::Existential(
                     Variable('x', Subscript(None)),
-                    Predicate::Conjunctive(
-                        Box::new(Predicate::Simple(
+                    Box::new(Formula::Conjunction(
+                        Box::new(Formula::Predicate(
                             PredicateLetter('K', Subscript(None), Degree(1)),
                             vec![Term::Variable(Variable('x', Subscript(None)))],
                         )),
-                        Box::new(Predicate::Simple(
+                        Box::new(Formula::Predicate(
                             PredicateLetter('D', Subscript(None), Degree(1)),
                             vec![Term::Variable(Variable('x', Subscript(None)))],
                         )),
-                    ),
+                    )),
                 ),
                 Statement::Universal(
                     Variable('x', Subscript(None)),
-                    Predicate::Conditional(
-                        Box::new(Predicate::Simple(
+                    Box::new(Formula::Conditional(
+                        Box::new(Formula::Predicate(
                             PredicateLetter('D', Subscript(None), Degree(1)),
                             vec![Term::Variable(Variable('x', Subscript(None)))],
                         )),
-                        Box::new(Predicate::Simple(
+                        Box::new(Formula::Predicate(
                             PredicateLetter('B', Subscript(None), Degree(1)),
                             vec![Term::Variable(Variable('x', Subscript(None)))],
                         )),
-                    ),
+                    )),
                 ),
             ],
             Statement::LogicalDisjunction(
@@ -238,30 +238,30 @@ mod tests {
             vec![Statement::LogicalNegation(Box::new(
                 Statement::Existential(
                     Variable('x', Subscript(None)),
-                    Predicate::Conjunctive(
-                        Box::new(Predicate::Simple(
+                    Box::new(Formula::Conjunction(
+                        Box::new(Formula::Predicate(
                             PredicateLetter('A', Subscript(None), Degree(1)),
                             vec![Term::Variable(Variable('x', Subscript(None)))],
                         )),
-                        Box::new(Predicate::Negative(Box::new(Predicate::Simple(
+                        Box::new(Formula::Negation(Box::new(Formula::Predicate(
                             PredicateLetter('B', Subscript(None), Degree(1)),
                             vec![Term::Variable(Variable('x', Subscript(None)))],
                         )))),
-                    ),
+                    )),
                 ),
             ))],
             Statement::Existential(
                 Variable('x', Subscript(None)),
-                Predicate::Conditional(
-                    Box::new(Predicate::Simple(
+                Box::new(Formula::Conditional(
+                    Box::new(Formula::Predicate(
                         PredicateLetter('A', Subscript(None), Degree(1)),
                         vec![Term::Variable(Variable('x', Subscript(None)))],
                     )),
-                    Box::new(Predicate::Simple(
+                    Box::new(Formula::Predicate(
                         PredicateLetter('B', Subscript(None), Degree(1)),
                         vec![Term::Variable(Variable('x', Subscript(None)))],
                     )),
-                ),
+                )),
             ),
         ));
 

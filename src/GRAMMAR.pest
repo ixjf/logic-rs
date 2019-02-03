@@ -1,5 +1,4 @@
-// TODO: Support for groupers, nested quantifiers!!! (can't have quantifier
-// with existing variable as well)
+// TODO: Support for groupers
 
 // This specification does not take into account these:
 // 1. Degree of predicate matching number of terms
@@ -12,7 +11,6 @@ WHITESPACE = _{ " " | NEWLINE | "\t" }
 
 input = { SOI ~ (statement_set | argument) ~ EOI }
 
-//grouper = { grouper_opening ~ formula ~ grouper_closing }
 grouper_opening = _{ "(" }
 grouper_closing = _{ ")" }
 
@@ -33,6 +31,55 @@ argument = {
     premise ~ (statement_separator ~ premise)* ~
     conclusion_indicator ~
     conclusion
+}
+
+formula = { 
+	compound_formula | 
+    atomic_formula
+}
+
+atomic_formula = {
+	simple_predicate |
+    simple_statement
+}
+
+compound_formula = {
+    complex_statement |
+	compound_formula_conjunction |
+    compound_formula_negation |
+    compound_formula_disjunction |
+    compound_formula_conditional
+}
+
+compound_formula_conjunction = {
+    grouper_opening ~ 
+    formula ~ 
+    conjunction_connective ~ 
+    formula ~ 
+    grouper_closing
+}
+
+compound_formula_negation = {
+    grouper_opening ~ 
+    negation_connective ~ 
+    formula ~ 
+    grouper_closing
+}
+
+compound_formula_disjunction = {
+    grouper_opening ~ 
+    formula ~ 
+    disjunction_connective ~ 
+    formula ~ 
+    grouper_closing
+}
+
+compound_formula_conditional = {
+    grouper_opening ~ 
+    formula ~ 
+    conditional_connective ~ 
+    formula ~ 
+    grouper_closing
 }
 
 statement = { complex_statement | simple_statement }
@@ -76,15 +123,15 @@ logical_conditional = {
 }
 
 subscript_number = ${ !"\u{2080}" ~ ('\u{2081}'..'\u{2089}'+ ~ "\u{2080}"*)+ }
-// Hack because pest doesn't include built-in rules in the AST
 simple_statement_letter_alpha = { ASCII_ALPHA_UPPER }
 simple_statement_letter = ${ simple_statement_letter_alpha ~ subscript_number? }
+
 simple_statement = {
     singular_statement |
     simple_statement_letter
 }
 
-singular_term_alpha = { (&(!('x'..'z')) ~ ASCII_ALPHA_LOWER) }
+singular_term_alpha = { !variable_alpha ~ ASCII_ALPHA_LOWER }
 singular_term = ${ 
     singular_term_alpha ~ 
     subscript_number? 
@@ -93,7 +140,7 @@ singular_term = ${
 variable_alpha = { 'x'..'z' }
 variable = ${ variable_alpha ~ subscript_number? }
 
-term = { singular_term | variable }
+// term = { singular_term | variable }
 
 superscript_number = @{ 
     !"\u{2070}" ~ (
@@ -110,62 +157,64 @@ predicate_letter = ${
 
 singular_statement = ${ predicate_letter ~ singular_term+ }
 
-predicate = { compound_predicate | simple_predicate }
+//predicate = { compound_predicate | simple_predicate }
 
 simple_predicate = ${ 
     predicate_letter ~ 
     (singular_term* ~ variable ~ singular_term*)+ 
 }
 
-conjunctive_predicate = { 
-    grouper_opening ~ 
-    predicate ~
+//conjunctive_predicate = { 
+//    grouper_opening ~ 
+//    predicate ~
     //(predicate | existential_statement | universal_statement) ~ 
-    conjunction_connective ~ 
-    predicate ~
+//    conjunction_connective ~ 
+//    predicate ~
     //(predicate | existential_statement | universal_statement) ~ 
-    grouper_closing 
-}
-negative_predicate = {
-    negation_connective ~ 
+//    grouper_closing 
+//}
+//negative_predicate = {
+//    negation_connective ~ 
     // (predicate | existential_statement | universal_statement)
-    predicate
-}
-disjunctive_predicate = {
-    grouper_opening ~ 
+//    predicate
+//}
+//disjunctive_predicate = {
+//    grouper_opening ~ 
     // (predicate | existential_statement | universal_statement) ~ 
-    predicate ~
-    disjunction_connective ~ 
+//    predicate ~
+//    disjunction_connective ~ 
     // (predicate | existential_statement | universal_statement) ~ 
-    predicate ~
-    grouper_closing
-}
-conditional_predicate = {
-    grouper_opening ~ 
-    // (predicate | existential_statement | universal_statement)~ 
-    predicate ~
-    conditional_connective ~ 
+//    predicate ~
+//    grouper_closing
+//}
+//conditional_predicate = {
+//    grouper_opening ~ 
     // (predicate | existential_statement | universal_statement) ~ 
-    predicate ~
-    grouper_closing
-}
-compound_predicate = { 
-    conjunctive_predicate |
-    negative_predicate |
-    disjunctive_predicate |
-    conditional_predicate
-}
+//    predicate ~
+//    conditional_connective ~ 
+    // (predicate | existential_statement | universal_statement) ~ 
+//    predicate ~
+//    grouper_closing
+//}
+//compound_predicate = { 
+//    conjunctive_predicate |
+//    negative_predicate |
+//    disjunctive_predicate |
+//    conditional_predicate
+//}
 
 existential_quantifier = _{ "\u{2203}" }
 existential_statement = { 
     existential_quantifier ~ 
     variable ~ 
-    predicate 
+    formula
+    //predicate 
 }
 
 universal_quantifier = _{ "\u{2200}" }
 universal_statement = { 
     universal_quantifier ~ 
     variable ~ 
-    predicate 
+    formula
+    //predicate 
 }
