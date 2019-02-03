@@ -1,9 +1,10 @@
-// TODO: Support for groupers
+// TODO: Support for groupers, somehow clean this up, merging formula with statement
 
 // This specification does not take into account these:
 // 1. Degree of predicate matching number of terms
-// 2. Binding correct variable to predicate in quantifier
-// 3. (not yet implemented at all) Operator precedence
+// 2. Binding variable that's already in use to quantifier
+// 3. Predicate binding to variable that isn't in scope
+// 4. (not yet implemented at all) Operator precedence
 // For all else, if it doesn't match wiki/Language, it's
 // a bug
 

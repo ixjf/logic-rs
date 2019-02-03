@@ -1,5 +1,6 @@
 // TODO: Maybe semantic checks should be impl for the following types?
 // And they're pub(in parser)
+use std::fmt;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Subscript(pub Option<u64>);
@@ -86,8 +87,8 @@ use pest::iterators::{Pair, Pairs};
 use pest::Span;
 
 pub struct Error {
-    pub decorated_message: String,
-    pub position: (usize, usize),
+    pub location: (usize, usize),
+    decorated_message: String,
 }
 
 impl Error {
@@ -100,7 +101,7 @@ impl Error {
         );
 
         Error {
-            position: span.start_pos().line_col(),
+            location: span.start_pos().line_col(),
             decorated_message: format!("{}", e),
         }
     }
@@ -108,15 +109,21 @@ impl Error {
     pub(in crate::parser) fn new_from_parsing_error(e: pest_error<Rule>) -> Error {
         use pest::error::LineColLocation;
 
-        let position = match e.line_col {
+        let location = match e.line_col {
             LineColLocation::Pos((line, col)) => (line, col),
             _ => unreachable!(), // is this actually unreachable? it's not documented
         };
 
         Error {
-            position,
+            location,
             decorated_message: format!("{}", e),
         }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.decorated_message)
     }
 }
 
@@ -651,10 +658,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn custom_error_provides_correct_position_info() {
+    fn custom_error_provides_correct_location_info() {
         let e =
             Error::new_from_custom_error(Span::new("Hello world!", 0, 4).unwrap(), "missing comma");
-        assert!(e.position.0 == 1 && e.position.1 == 1);
+        assert!(e.location.0 == 1 && e.location.1 == 1);
     }
 
     #[test]
