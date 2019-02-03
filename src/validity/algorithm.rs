@@ -126,15 +126,7 @@ impl TruthTreeMethod {
             branch_id,
         }) = queue.pop()
         {
-            if self
-                .tree
-                .traverse_downwards_branch_ids(&self.tree.main_trunk_id())
-                .filter(|x| {
-                    !self.tree.branch_from_id(&x).is_closed() && self.tree.branch_is_last_child(&x)
-                })
-                .count()
-                == 0
-            {
+            if !self.tree.is_open() {
                 // There are no open branches in the entire tree, stop
                 break;
             }

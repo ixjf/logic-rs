@@ -1,7 +1,5 @@
 // TODO: Support for groupers, somehow clean this up, merging formula with statement
-// Do not allow retrieving the intermediate ParseTrees, because why the hell should
-// the user have it, eliminating the possibility of the truth tree algorithm
-// receiving invalid input
+// Add proper tests for algorithm.rs
 
 // This specification does not take into account these:
 // 1. Degree of predicate matching number of terms

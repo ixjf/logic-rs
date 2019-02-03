@@ -266,6 +266,13 @@ impl<'a> TruthTree {
             .insert(Node::new(branch), UnderNode(&as_child_of_branch_id.0))
             .expect("invalid branch_id"))
     }
+
+    pub fn is_open(&self) -> bool {
+        self.traverse_downwards_branch_ids(&self.main_trunk_id())
+            .filter(|x| self.branch_is_last_child(&x) && !self.branch_from_id(&x).is_closed())
+            .count()
+            > 0
+    }
 }
 
 #[cfg(test)]
@@ -624,5 +631,24 @@ mod tests {
         assert_eq!(iter.next(), Some(Id(root_id.0.clone())));
         assert_eq!(iter.next(), Some(Id(child_branch_1_id.0.clone())));
         assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn statement_tree_is_open() {
+        let mut statement_tree = TruthTree::new(Branch::new(vec![BRANCH_NODE_1.clone()]));
+
+        assert!(
+            statement_tree.is_open(),
+            "returned not open but tree is open"
+        );
+
+        statement_tree
+            .branch_from_id_mut(&statement_tree.main_trunk_id())
+            .close();
+
+        assert!(
+            !statement_tree.is_open(),
+            "returned open but tree is not open"
+        );
     }
 }

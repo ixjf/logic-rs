@@ -1,11 +1,10 @@
 mod algorithm;
 mod truth_tree;
 
-use self::algorithm::TruthTreeMethod;
-use self::truth_tree::TruthTree;
+pub use self::algorithm::TruthTreeMethod;
+pub use self::truth_tree::TruthTree;
+/*
 use crate::parser::{Input, ParseTree, Statement};
-
-// FIXME Algorithm doesn't check validity of input
 
 pub enum Error {
     NotAStatementSet,
@@ -552,3 +551,4 @@ mod tests {
         }
     }
 }
+*/
