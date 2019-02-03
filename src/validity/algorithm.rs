@@ -2,6 +2,7 @@ use super::truth_tree::*;
 use crate::parser::{Formula, SingularTerm, Statement, Subscript, Term, Variable};
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
+use std::iter::once;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Rule {
@@ -850,18 +851,11 @@ impl TruthTreeMethod {
         // If it is, returns that
         // If it isn't, it checks if 'a2', 'b2', 'c2', etc. is available
         // etc. etc. etc.
-        for c in 'a' as u8..='w' as u8 {
-            if !stack.iter().any(|x| x.0 == c as char) {
-                return SingularTerm(c as char, Subscript(None));
-            }
-        }
-
-        for subscript in 1.. {
+        for subscript in once(Subscript(None)).chain((1..).map(|x| Subscript(Some(x)))) {
             for c in 'a' as u8..='w' as u8 {
-                if !stack.iter().any(|x| match x {
-                    SingularTerm(a, b) => *a == c as char && b.0 == Some(subscript),
-                }) {
-                    return SingularTerm(c as char, Subscript(Some(subscript)));
+                let singular_term = SingularTerm(c as char, subscript.clone());
+                if !stack.iter().any(|x| x == &singular_term) {
+                    return singular_term;
                 }
             }
         }
