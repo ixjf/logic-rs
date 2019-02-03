@@ -793,7 +793,7 @@ mod tests {
     fn parses_multiply_general_statements() {
         let parser = Parser::new();
 
-        match parser.parse("{∀x((A¹x & B¹x) ⊃ ∀y((~C¹y) ⊃ ∃z(A²zy & B¹z)))}") {
+        match parser.parse("{∀x((A¹x & B¹x) ⊃ ∀y(~C¹y ⊃ ∃z(A²zy & B¹z)))}") {
             Ok(_) => {}
             Err(e) => assert!(false, format!("{}", e)),
         }

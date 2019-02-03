@@ -1,10 +1,9 @@
-// TODO: Support for groupers, somehow clean this up, merging formula with statement
+// Make sure wiki/Language is correct
 
 // This specification does not take into account these:
 // 1. Degree of predicate matching number of terms
 // 2. Binding variable that's already in use to quantifier
 // 3. Predicate binding to variable that isn't in scope
-// 4. (not yet implemented at all) Operator precedence
 // For all else, if it doesn't match wiki/Language, it's
 // a bug
 
@@ -35,6 +34,7 @@ argument = {
 }
 
 formula = { 
+    (grouper_opening ~ formula ~ grouper_closing) |
 	compound_formula | 
     atomic_formula
 }
@@ -45,11 +45,11 @@ atomic_formula = {
 }
 
 compound_formula = {
-    complex_statement |
 	compound_formula_conjunction |
     compound_formula_negation |
     compound_formula_disjunction |
-    compound_formula_conditional
+    compound_formula_conditional |
+    complex_statement
 }
 
 compound_formula_conjunction = {
@@ -61,10 +61,7 @@ compound_formula_conjunction = {
 }
 
 compound_formula_negation = {
-    grouper_opening ~ 
-    negation_connective ~ 
-    formula ~ 
-    grouper_closing
+    negation_connective ~ formula
 }
 
 compound_formula_disjunction = {
@@ -83,7 +80,11 @@ compound_formula_conditional = {
     grouper_closing
 }
 
-statement = { complex_statement | simple_statement }
+statement = { 
+    (grouper_opening ~ statement ~ grouper_closing) | 
+    complex_statement | 
+    simple_statement 
+}
 complex_statement = { 
     logical_conjunction | 
     logical_negation | 
@@ -103,7 +104,9 @@ logical_conjunction = {
 }
 
 negation_connective = _{ "~" }
-logical_negation = { negation_connective ~ statement }
+logical_negation = {
+    negation_connective ~ statement 
+}
 
 disjunction_connective = _{ "\u{2228}" }
 logical_disjunction = { 
@@ -156,21 +159,24 @@ predicate_letter = ${
 
 singular_statement = ${ predicate_letter ~ singular_term+ }
 
-simple_predicate = ${ 
-    predicate_letter ~ 
-    (singular_term* ~ variable ~ singular_term*)+ 
+simple_predicate = ${
+    predicate_letter ~ (singular_term* ~ variable ~ singular_term*)+ 
 }
 
 existential_quantifier = _{ "\u{2203}" }
 existential_statement = { 
-    existential_quantifier ~ 
-    variable ~ 
+    (
+        (grouper_opening ~ existential_quantifier ~ variable ~ grouper_closing) |
+        (existential_quantifier ~ variable)
+    ) ~ 
     formula
 }
 
 universal_quantifier = _{ "\u{2200}" }
 universal_statement = { 
-    universal_quantifier ~ 
-    variable ~ 
+    (
+        (grouper_opening ~ universal_quantifier ~ variable ~ grouper_closing) | 
+        (universal_quantifier ~ variable)
+    ) ~ 
     formula
 }
