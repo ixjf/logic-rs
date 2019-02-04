@@ -91,7 +91,10 @@ impl Parser {
         match inner.as_rule() {
             Rule::complex_statement => self.complex_statement_into_ast(inner, &mut stack),
             Rule::simple_statement => self.simple_statement_into_ast(inner),
-            _ => unreachable!(),
+            _ => {
+                // Statement inside grouper
+                self.statement_into_ast(inner, &mut stack)
+            }
         }
     }
 
@@ -372,7 +375,10 @@ impl Parser {
         match inner.as_rule() {
             Rule::compound_formula => self.compound_formula_into_ast(inner, &mut stack),
             Rule::atomic_formula => self.atomic_formula_into_ast(inner, &mut stack),
-            _ => unreachable!(),
+            _ => {
+                // Formula inside grouper
+                self.formula_into_ast(inner, &mut stack)
+            }
         }
     }
 
