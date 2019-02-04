@@ -7,7 +7,7 @@
 
 WHITESPACE = _{ " " | NEWLINE | "\t" }
 
-input = { SOI ~ (statement_set | argument) ~ EOI }
+input = { SOI ~ (statement_set | argument | statement) ~ EOI }
 
 grouper_opening = _{ "(" }
 grouper_closing = _{ ")" }

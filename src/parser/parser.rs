@@ -26,7 +26,14 @@ impl Parser {
         let inner = pairs.next().unwrap().into_inner().next().unwrap();
         match inner.as_rule() {
             Rule::statement_set => self.statement_set_into_ast(inner),
+
             Rule::argument => self.argument_into_ast(inner),
+
+            Rule::statement => match self.statement_into_ast(inner, &mut Vec::new()) {
+                Ok(st) => Ok(ParseTree(Input::Statement(st))),
+                Err(e) => Err(e),
+            },
+
             _ => unreachable!(),
         }
     }
@@ -564,6 +571,19 @@ mod tests {
         match parser.parse("A, B, C, D, F ∴ G") {
             Ok(ref parse_tree) => match parse_tree.0 {
                 Input::Argument(_, _) => {}
+                _ => assert!(false),
+            },
+            Err(e) => assert!(false, format!("{}", e)),
+        }
+    }
+
+    #[test]
+    fn parses_single_statement() {
+        let parser = Parser::new();
+
+        match parser.parse("A") {
+            Ok(ref parse_tree) => match parse_tree.0 {
+                Input::Statement(_) => {}
                 _ => assert!(false),
             },
             Err(e) => assert!(false, format!("{}", e)),

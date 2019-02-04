@@ -35,6 +35,7 @@ pub struct PredicateLetter(pub char, pub Subscript, pub Degree);
 pub enum Input {
     StatementSet(Vec<Statement>),
     Argument(Vec<Statement>, Statement),
+    Statement(Statement),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
