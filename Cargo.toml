@@ -1,5 +1,5 @@
 [package]
-name = "wasm-frontend"
+name = "wasm-layer"
 version = "0.1.0"
 authors = ["Pedro Fanha <ixjf@outlook.com>"]
 
