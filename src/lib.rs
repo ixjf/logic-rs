@@ -4,6 +4,10 @@ extern crate pest_derive;
 
 extern crate id_tree;
 
+#[cfg(feature = "serde_support")]
+#[macro_use]
+extern crate serde;
+
 mod parser;
 mod validity;
 

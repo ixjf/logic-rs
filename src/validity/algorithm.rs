@@ -5,6 +5,7 @@ use std::collections::BinaryHeap;
 use std::iter::once;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub enum Rule {
     QuantifierExchange,
     ExistentialQuantifier,
@@ -158,10 +159,10 @@ impl TruthTreeMethod {
                                             .append_statement(BranchNode {
                                                 statement: x.clone(),
                                                 derived_from: Some((
-                                                    BranchNodeLocation(
-                                                        statement_id.clone(),
-                                                        branch_id.clone(),
-                                                    ),
+                                                    BranchNodeLocation {
+                                                        node_id: statement_id.clone(),
+                                                        branch_id: branch_id.clone(),
+                                                    },
                                                     rule.clone(),
                                                 )),
                                             });
@@ -175,10 +176,10 @@ impl TruthTreeMethod {
                                         let new_branch = Branch::new(vec![BranchNode {
                                             statement: x.clone(),
                                             derived_from: Some((
-                                                BranchNodeLocation(
-                                                    statement_id.clone(),
-                                                    branch_id.clone(),
-                                                ),
+                                                BranchNodeLocation {
+                                                    node_id: statement_id.clone(),
+                                                    branch_id: branch_id.clone(),
+                                                },
                                                 rule.clone(),
                                             )),
                                         }]);

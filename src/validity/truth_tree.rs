@@ -4,8 +4,14 @@ use id_tree::InsertBehavior::*;
 use id_tree::*;
 use std::iter::{once, Chain, Once};
 
+#[cfg(feature = "serde_support")]
+use serde::ser::{Serialize, SerializeSeq, SerializeStruct, Serializer};
+
 #[derive(Clone, Debug)]
-pub struct BranchNodeLocation(pub Id, pub Id); // Statement ID, Branch ID
+pub struct BranchNodeLocation {
+    pub node_id: Id,
+    pub branch_id: Id,
+}
 
 #[derive(Clone, Debug)]
 pub struct BranchNode {
@@ -13,7 +19,8 @@ pub struct BranchNode {
     pub derived_from: Option<(BranchNodeLocation, Rule)>,
 }
 
-#[derive(PartialEq, Eq, Debug, Clone)]
+#[derive(PartialEq, Eq, Debug, Clone, Hash)]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct Id(NodeId);
 
 pub struct Branch {
@@ -82,6 +89,7 @@ impl Branch {
     }
 }
 
+#[derive(Clone)]
 pub struct StatementsIter<'a> {
     tree: &'a Tree<BranchNode>,
     stack: Vec<&'a NodeId>,
@@ -112,6 +120,7 @@ impl<'a> Iterator for StatementsIter<'a> {
     }
 }
 
+#[derive(Clone)]
 pub struct IdsIter<'a, T> {
     tree: &'a Tree<T>,
     stack: Vec<&'a NodeId>,
@@ -142,6 +151,7 @@ impl<'a, T> Iterator for IdsIter<'a, T> {
     }
 }
 
+// FIXME Why can't I derive Clone here?
 pub struct UpwardsBranchIdsIter<'a> {
     iter: Chain<Once<&'a NodeId>, AncestorIds<'a, Branch>>,
 }
@@ -154,6 +164,7 @@ impl<'a> Iterator for UpwardsBranchIdsIter<'a> {
     }
 }
 
+// FIXME Why can't I derive Clone here?
 pub struct UpwardsBranchesIter<'a> {
     iter: Chain<Once<&'a NodeId>, AncestorIds<'a, Branch>>,
     tree: &'a Tree<Branch>,
@@ -169,6 +180,7 @@ impl<'a> Iterator for UpwardsBranchesIter<'a> {
     }
 }
 
+#[derive(Clone)]
 pub struct BranchImmediateChildrenIdsIter<'a> {
     iter: ChildrenIds<'a>,
 }
@@ -272,6 +284,106 @@ impl<'a> TruthTree {
             .filter(|x| self.branch_is_last_child(&x) && !self.branch_from_id(&x).is_closed())
             .count()
             > 0
+    }
+}
+
+#[cfg(feature = "serde_support")]
+impl Serialize for TruthTree {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        struct BranchSer<'a>(&'a Id, &'a TruthTree);
+
+        impl<'a> Serialize for BranchSer<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                let mut branch = serializer.serialize_struct("Branch", 4)?;
+                branch.serialize_field("id", &self.0)?;
+                branch.serialize_field("closed", &self.1.branch_from_id(&self.0).is_closed())?;
+                branch.serialize_field(
+                    "nodes",
+                    &BranchNodesSer(&self.1.branch_from_id(&self.0).statements()),
+                )?;
+                branch.serialize_field("children", &BranchChildrenSer(&self.0, &self.1))?;
+                branch.end()
+            }
+        }
+
+        struct BranchNodesSer<'a>(&'a StatementsIter<'a>);
+
+        impl<'a> Serialize for BranchNodesSer<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                let mut seq = serializer.serialize_seq(None)?;
+                let iter = self.0.clone();
+                for (statement_id, branch_node) in iter {
+                    seq.serialize_element(&BranchNodeSer(&statement_id, &branch_node))?;
+                }
+                seq.end()
+            }
+        }
+
+        struct BranchNodeSer<'a>(&'a Id, &'a BranchNode);
+
+        impl<'a> Serialize for BranchNodeSer<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                let mut node = serializer.serialize_struct("BranchNode", 3)?;
+                node.serialize_field("id", &self.0)?;
+                node.serialize_field("statement", &self.1.statement)?;
+                node.serialize_field("derived_from: ", &DerivedFromSer(&self.1.derived_from))?;
+                node.end()
+            }
+        }
+
+        struct DerivedFromSer<'a>(&'a Option<(BranchNodeLocation, Rule)>);
+
+        impl<'a> Serialize for DerivedFromSer<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                match self.0 {
+                    Some((node_loc, rule)) => {
+                        let mut derived_from = serializer.serialize_struct("DerivedFrom", 3)?;
+                        derived_from.serialize_field("node_id", &node_loc.node_id)?;
+                        derived_from.serialize_field("branch_id", &node_loc.branch_id)?;
+                        derived_from.serialize_field("rule", &rule)?;
+                        derived_from.end()
+                    }
+                    None => {
+                        let derived_from = serializer.serialize_struct("DerivedFrom", 0)?;
+                        derived_from.end()
+                    }
+                }
+            }
+        }
+
+        struct BranchChildrenSer<'a>(&'a Id, &'a TruthTree);
+
+        impl<'a> Serialize for BranchChildrenSer<'a> {
+            fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+            where
+                S: Serializer,
+            {
+                let mut seq = serializer.serialize_seq(None)?;
+                for branch_id in self.1.traverse_branch_immediate_children_ids(&self.0) {
+                    seq.serialize_element(&BranchSer(&branch_id, &self.1))?;
+                }
+                seq.end()
+            }
+        }
+
+        let mut tree = serializer.serialize_struct("TruthTree", 1)?;
+        tree.serialize_field("main_trunk", &BranchSer(&self.main_trunk_id(), &self))?;
+        tree.end()
     }
 }
 
