@@ -1,0 +1,30 @@
+import { tokens } from './tokens.js';
+
+export var keysMap = {
+    // Key must match codemirror's syntax for keys
+    'Ctrl-Q': tokens.conclusionIndicator,
+    'Alt-1': tokens.subscriptNumber1,
+    'Alt-2': tokens.subscriptNumber2,
+    'Alt-3': tokens.subscriptNumber3,
+    'Alt-4': tokens.subscriptNumber4,
+    'Alt-5': tokens.subscriptNumber5,
+    'Alt-6': tokens.subscriptNumber6,
+    'Alt-7': tokens.subscriptNumber7,
+    'Alt-8': tokens.subscriptNumber8,
+    'Alt-9': tokens.subscriptNumber9,
+    'Alt-0': tokens.subscriptNumber0,
+    'Shift-Alt-1': tokens.superscriptNumber1,
+    'Shift-Alt-2': tokens.superscriptNumber2,
+    'Shift-Alt-3': tokens.superscriptNumber3,
+    'Shift-Alt-4': tokens.superscriptNumber4,
+    'Shift-Alt-5': tokens.superscriptNumber5,
+    'Shift-Alt-6': tokens.superscriptNumber6,
+    'Shift-Alt-7': tokens.superscriptNumber7,
+    'Shift-Alt-8': tokens.superscriptNumber8,
+    'Shift-Alt-9': tokens.superscriptNumber9,
+    'Shift-Alt-0': tokens.superscriptNumber0,
+    'Ctrl-O': tokens.disjunction,
+    'Ctrl-U': tokens.conditional,
+    'Ctrl-H': tokens.existentialQuantifier,
+    'Ctrl-E': tokens.universalQuantifier,
+};
