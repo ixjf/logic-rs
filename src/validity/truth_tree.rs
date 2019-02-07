@@ -338,7 +338,7 @@ impl Serialize for TruthTree {
                 let mut node = serializer.serialize_struct("BranchNode", 3)?;
                 node.serialize_field("id", &self.0)?;
                 node.serialize_field("statement", &self.1.statement)?;
-                node.serialize_field("derived_from: ", &DerivedFromSer(&self.1.derived_from))?;
+                node.serialize_field("derived_from", &DerivedFromSer(&self.1.derived_from))?;
                 node.end()
             }
         }
