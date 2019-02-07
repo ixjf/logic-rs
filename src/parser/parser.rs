@@ -29,7 +29,7 @@ impl Parser {
 
             Rule::argument => self.argument_into_ast(inner),
 
-            Rule::statement => match self.statement_into_ast(inner, &mut Vec::new()) {
+            Rule::statement => match self.statement_into_ast(inner, &Vec::new()) {
                 Ok(st) => Ok(ParseTree(Input::Statement(st))),
                 Err(e) => Err(e),
             },
@@ -44,7 +44,7 @@ impl Parser {
         let mut statements = Vec::new();
 
         for st_pair in pair.into_inner() {
-            match self.statement_into_ast(st_pair, &mut Vec::new()) {
+            match self.statement_into_ast(st_pair, &Vec::new()) {
                 Ok(st) => statements.push(st),
                 Err(e) => return Err(e),
             }
@@ -61,8 +61,7 @@ impl Parser {
         for st_pair in pair.into_inner() {
             match st_pair.as_rule() {
                 Rule::premise | Rule::conclusion => {
-                    match self
-                        .statement_into_ast(st_pair.into_inner().next().unwrap(), &mut Vec::new())
+                    match self.statement_into_ast(st_pair.into_inner().next().unwrap(), &Vec::new())
                     {
                         Ok(st) => statements.push(st),
                         Err(e) => return Err(e),
@@ -82,18 +81,18 @@ impl Parser {
     fn statement_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Statement, Error> {
         assert!(pair.as_rule() == Rule::statement);
 
         let inner = pair.into_inner().next().unwrap();
 
         match inner.as_rule() {
-            Rule::complex_statement => self.complex_statement_into_ast(inner, &mut stack),
+            Rule::complex_statement => self.complex_statement_into_ast(inner, &stack),
             Rule::simple_statement => self.simple_statement_into_ast(inner),
             _ => {
                 // Statement inside grouper
-                self.statement_into_ast(inner, &mut stack)
+                self.statement_into_ast(inner, &stack)
             }
         }
     }
@@ -101,19 +100,19 @@ impl Parser {
     fn complex_statement_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Statement, Error> {
         assert!(pair.as_rule() == Rule::complex_statement);
 
         let inner = pair.into_inner().next().unwrap();
 
         match inner.as_rule() {
-            Rule::logical_conjunction => self.logical_conjunction_into_ast(inner, &mut stack),
-            Rule::logical_negation => self.logical_negation_into_ast(inner, &mut stack),
-            Rule::logical_disjunction => self.logical_disjunction_into_ast(inner, &mut stack),
-            Rule::logical_conditional => self.logical_conditional_into_ast(inner, &mut stack),
-            Rule::existential_statement => self.existential_statement_into_ast(inner, &mut stack),
-            Rule::universal_statement => self.universal_statement_into_ast(inner, &mut stack),
+            Rule::logical_conjunction => self.logical_conjunction_into_ast(inner, &stack),
+            Rule::logical_negation => self.logical_negation_into_ast(inner, &stack),
+            Rule::logical_disjunction => self.logical_disjunction_into_ast(inner, &stack),
+            Rule::logical_conditional => self.logical_conditional_into_ast(inner, &stack),
+            Rule::existential_statement => self.existential_statement_into_ast(inner, &stack),
+            Rule::universal_statement => self.universal_statement_into_ast(inner, &stack),
             _ => unreachable!(),
         }
     }
@@ -121,14 +120,14 @@ impl Parser {
     fn logical_conjunction_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Statement, Error> {
         assert!(pair.as_rule() == Rule::logical_conjunction);
 
         let mut inner = pair.into_inner();
 
-        let lstatement = self.statement_into_ast(inner.next().unwrap(), &mut stack)?;
-        let rstatement = self.statement_into_ast(inner.next().unwrap(), &mut stack)?;
+        let lstatement = self.statement_into_ast(inner.next().unwrap(), &stack.clone())?;
+        let rstatement = self.statement_into_ast(inner.next().unwrap(), &stack.clone())?;
 
         Ok(Statement::LogicalConjunction(
             Box::new(lstatement),
@@ -139,13 +138,13 @@ impl Parser {
     fn logical_negation_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Statement, Error> {
         assert!(pair.as_rule() == Rule::logical_negation);
 
         let mut inner = pair.into_inner();
 
-        let rstatement = self.statement_into_ast(inner.next().unwrap(), &mut stack)?;
+        let rstatement = self.statement_into_ast(inner.next().unwrap(), &stack)?;
 
         Ok(Statement::LogicalNegation(Box::new(rstatement)))
     }
@@ -153,14 +152,14 @@ impl Parser {
     fn logical_disjunction_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Statement, Error> {
         assert!(pair.as_rule() == Rule::logical_disjunction);
 
         let mut inner = pair.into_inner();
 
-        let lstatement = self.statement_into_ast(inner.next().unwrap(), &mut stack)?;
-        let rstatement = self.statement_into_ast(inner.next().unwrap(), &mut stack)?;
+        let lstatement = self.statement_into_ast(inner.next().unwrap(), &stack.clone())?;
+        let rstatement = self.statement_into_ast(inner.next().unwrap(), &stack.clone())?;
 
         Ok(Statement::LogicalDisjunction(
             Box::new(lstatement),
@@ -171,14 +170,14 @@ impl Parser {
     fn logical_conditional_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Statement, Error> {
         assert!(pair.as_rule() == Rule::logical_conditional);
 
         let mut inner = pair.into_inner();
 
-        let lstatement = self.statement_into_ast(inner.next().unwrap(), &mut stack)?;
-        let rstatement = self.statement_into_ast(inner.next().unwrap(), &mut stack)?;
+        let lstatement = self.statement_into_ast(inner.next().unwrap(), &stack.clone())?;
+        let rstatement = self.statement_into_ast(inner.next().unwrap(), &stack.clone())?;
 
         Ok(Statement::LogicalConditional(
             Box::new(lstatement),
@@ -189,7 +188,7 @@ impl Parser {
     fn existential_statement_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Statement, Error> {
         assert!(pair.as_rule() == Rule::existential_statement);
 
@@ -204,8 +203,9 @@ impl Parser {
             ));
         }
 
+        let mut stack = stack.clone();
         stack.push(variable.clone());
-        let formula = self.formula_into_ast(inner.next().unwrap(), &mut stack)?;
+        let formula = self.formula_into_ast(inner.next().unwrap(), &stack)?;
 
         Ok(Statement::Existential(variable, Box::new(formula)))
     }
@@ -213,7 +213,7 @@ impl Parser {
     fn universal_statement_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Statement, Error> {
         assert!(pair.as_rule() == Rule::universal_statement);
 
@@ -228,8 +228,9 @@ impl Parser {
             ));
         }
 
+        let mut stack = stack.clone();
         stack.push(variable.clone());
-        let formula = self.formula_into_ast(inner.next().unwrap(), &mut stack)?;
+        let formula = self.formula_into_ast(inner.next().unwrap(), &stack)?;
 
         Ok(Statement::Universal(variable, Box::new(formula)))
     }
@@ -363,21 +364,17 @@ impl Parser {
         ))
     }
 
-    fn formula_into_ast(
-        &self,
-        pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
-    ) -> Result<Formula, Error> {
+    fn formula_into_ast(&self, pair: Pair<Rule>, stack: &Vec<Variable>) -> Result<Formula, Error> {
         assert!(pair.as_rule() == Rule::formula);
 
         let inner = pair.into_inner().next().unwrap();
 
         match inner.as_rule() {
-            Rule::compound_formula => self.compound_formula_into_ast(inner, &mut stack),
-            Rule::atomic_formula => self.atomic_formula_into_ast(inner, &mut stack),
+            Rule::compound_formula => self.compound_formula_into_ast(inner, &stack),
+            Rule::atomic_formula => self.atomic_formula_into_ast(inner, &stack),
             _ => {
                 // Formula inside grouper
-                self.formula_into_ast(inner, &mut stack)
+                self.formula_into_ast(inner, &stack)
             }
         }
     }
@@ -385,7 +382,7 @@ impl Parser {
     fn compound_formula_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Formula, Error> {
         assert!(pair.as_rule() == Rule::compound_formula);
 
@@ -393,19 +390,19 @@ impl Parser {
 
         match inner.as_rule() {
             Rule::complex_statement => self
-                .complex_statement_into_ast(inner, &mut stack)
+                .complex_statement_into_ast(inner, &stack)
                 .map(|x| Formula::Statement(Box::new(x))),
             Rule::compound_formula_conjunction => {
-                self.compound_formula_conjunction_into_ast(inner, &mut stack)
+                self.compound_formula_conjunction_into_ast(inner, &stack)
             }
             Rule::compound_formula_negation => {
-                self.compound_formula_negation_into_ast(inner, &mut stack)
+                self.compound_formula_negation_into_ast(inner, &stack)
             }
             Rule::compound_formula_disjunction => {
-                self.compound_formula_disjunction_into_ast(inner, &mut stack)
+                self.compound_formula_disjunction_into_ast(inner, &stack)
             }
             Rule::compound_formula_conditional => {
-                self.compound_formula_conditional_into_ast(inner, &mut stack)
+                self.compound_formula_conditional_into_ast(inner, &stack)
             }
             _ => unreachable!(),
         }
@@ -414,14 +411,14 @@ impl Parser {
     fn compound_formula_conjunction_into_ast(
         &self,
         pair: Pair<Rule>,
-        stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Formula, Error> {
         assert!(pair.as_rule() == Rule::compound_formula_conjunction);
 
         let mut inner = pair.into_inner();
 
-        let lformula = self.formula_into_ast(inner.next().unwrap(), &mut stack.clone())?;
-        let rformula = self.formula_into_ast(inner.next().unwrap(), &mut stack.clone())?;
+        let lformula = self.formula_into_ast(inner.next().unwrap(), &stack.clone())?;
+        let rformula = self.formula_into_ast(inner.next().unwrap(), &stack.clone())?;
 
         Ok(Formula::Conjunction(Box::new(lformula), Box::new(rformula)))
     }
@@ -429,13 +426,13 @@ impl Parser {
     fn compound_formula_negation_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Formula, Error> {
         assert!(pair.as_rule() == Rule::compound_formula_negation);
 
         let mut inner = pair.into_inner();
 
-        let rformula = self.formula_into_ast(inner.next().unwrap(), &mut stack)?;
+        let rformula = self.formula_into_ast(inner.next().unwrap(), &stack)?;
 
         Ok(Formula::Negation(Box::new(rformula)))
     }
@@ -443,14 +440,14 @@ impl Parser {
     fn compound_formula_disjunction_into_ast(
         &self,
         pair: Pair<Rule>,
-        stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Formula, Error> {
         assert!(pair.as_rule() == Rule::compound_formula_disjunction);
 
         let mut inner = pair.into_inner();
 
-        let lformula = self.formula_into_ast(inner.next().unwrap(), &mut stack.clone())?;
-        let rformula = self.formula_into_ast(inner.next().unwrap(), &mut stack.clone())?;
+        let lformula = self.formula_into_ast(inner.next().unwrap(), &stack.clone())?;
+        let rformula = self.formula_into_ast(inner.next().unwrap(), &stack.clone())?;
 
         Ok(Formula::Disjunction(Box::new(lformula), Box::new(rformula)))
     }
@@ -458,14 +455,14 @@ impl Parser {
     fn compound_formula_conditional_into_ast(
         &self,
         pair: Pair<Rule>,
-        stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Formula, Error> {
         assert!(pair.as_rule() == Rule::compound_formula_conditional);
 
         let mut inner = pair.into_inner();
 
-        let lformula = self.formula_into_ast(inner.next().unwrap(), &mut stack.clone())?;
-        let rformula = self.formula_into_ast(inner.next().unwrap(), &mut stack.clone())?;
+        let lformula = self.formula_into_ast(inner.next().unwrap(), &stack.clone())?;
+        let rformula = self.formula_into_ast(inner.next().unwrap(), &stack.clone())?;
 
         Ok(Formula::Conditional(Box::new(lformula), Box::new(rformula)))
     }
@@ -473,7 +470,7 @@ impl Parser {
     fn atomic_formula_into_ast(
         &self,
         pair: Pair<Rule>,
-        mut stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<Formula, Error> {
         assert!(pair.as_rule() == Rule::atomic_formula);
 
@@ -484,7 +481,7 @@ impl Parser {
                 .simple_statement_into_ast(inner)
                 .map(|x| Formula::Statement(Box::new(x))),
             Rule::simple_predicate => self
-                .simple_predicate_into_ast(inner, &mut stack)
+                .simple_predicate_into_ast(inner, &stack)
                 .map(|(pred_letter, terms)| Formula::Predicate(pred_letter, terms)),
             _ => unreachable!(),
         }
@@ -493,7 +490,7 @@ impl Parser {
     fn simple_predicate_into_ast(
         &self,
         pair: Pair<Rule>,
-        stack: &mut Vec<Variable>,
+        stack: &Vec<Variable>,
     ) -> Result<(PredicateLetter, Vec<Term>), Error> {
         assert!(pair.as_rule() == Rule::simple_predicate);
 
@@ -832,6 +829,16 @@ mod tests {
         match parser.parse("{∃x(A¹x & ∀x((A²xx & B¹x))}") {
             Ok(_) => assert!(false),
             Err(_) => {}
+        }
+    }
+
+    #[test]
+    fn understands_scope_of_variables() {
+        let parser = Parser::new();
+
+        match parser.parse("{(∀x(D¹x ⊃ P¹x) ⊃ ∀x(S¹x ⊃ P¹x))}") {
+            Ok(_) => {}
+            Err(_) => assert!(false),
         }
     }
 }
