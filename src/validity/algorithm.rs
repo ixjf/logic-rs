@@ -19,12 +19,15 @@ pub enum Rule {
     Disjunction,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 struct QueueNode {
     statement_id: Id,
     statement: Statement,
     rule: Option<(Rule, bool)>,
     branch_id: Id,
+    failed_last: bool, // Indicates whether the rule was applied successfully the last time
+                       // Useful for recursive rules where we need to avoid infinite loops if no rule in the queue
+                       // can be applied any longer.
 }
 
 impl Ord for QueueNode {
@@ -60,6 +63,15 @@ impl Ord for QueueNode {
             Rule::NegationOfConjunction,
             Rule::Disjunction,
         ];
+
+        // Whichever failed the last time shall come last as well
+        // (see end of 'compute' method for details)
+        match (self.failed_last, other.failed_last) {
+            (true, false) => return Ordering::Less,
+            (false, true) => return Ordering::Greater,
+            (true, true) => return Ordering::Greater,
+            (false, false) => {}
+        }
 
         match (&self.rule, &other.rule) {
             // Atomic statements should come first in the queue
@@ -133,6 +145,7 @@ impl TruthTreeMethod {
                 statement: tree_node.statement.clone(),
                 rule,
                 branch_id: self.tree.main_trunk_id(),
+                failed_last: false,
             });
         }
 
@@ -143,6 +156,7 @@ impl TruthTreeMethod {
             statement,
             rule,
             branch_id,
+            mut failed_last,
         }) = queue.pop()
         {
             if !self.tree.is_open() {
@@ -151,8 +165,8 @@ impl TruthTreeMethod {
             }
 
             match rule {
-                Some(rule) => {
-                    match self.apply_rule(rule.clone().0, &statement, &branch_id) {
+                Some((rule, repeat)) => {
+                    match self.apply_rule(rule.clone(), &statement, &branch_id) {
                         Some(result) => {
                             // Open child branches of branch where original statement is
                             let open_branches_ids = self
@@ -181,7 +195,7 @@ impl TruthTreeMethod {
                                                                 node_id: statement_id.clone(),
                                                                 branch_id: branch_id.clone(),
                                                             },
-                                                            rule.clone().0,
+                                                            rule.clone(),
                                                         )),
                                                     });
 
@@ -198,7 +212,7 @@ impl TruthTreeMethod {
                                                             node_id: statement_id.clone(),
                                                             branch_id: branch_id.clone(),
                                                         },
-                                                        rule.clone().0,
+                                                        rule.clone(),
                                                     )),
                                                 }]);
 
@@ -220,52 +234,56 @@ impl TruthTreeMethod {
                                         statement: x.clone(),
                                         rule: self.matches_some_rule(&x),
                                         branch_id: derived_statement_branch_id.clone(),
+                                        failed_last: false,
                                     };
                                     queue.push(new_node);
                                 }
                             }
+
+                            failed_last = false;
                         }
                         None => {
                             // Rule didn't need to be applied
 
-                            if rule.1 {
+                            if repeat {
                                 // Some rules can be reapplied over and over (i.e. UQ)
                                 // If this is the case, we readd this node to the queue
 
                                 // However, if we don't do anything else, we will run into an infinite
-                                // loop when the tree doesn't close. So what we need to do here is check
-                                // if there are no compound formulas left with rules to apply
-                                // (other than the current rule)
-                                // AND that it isn't possible to apply this rule anymore (which we know
-                                // because we've reached this 'None' - i.e. rule didn't apply)
-                                // If both of these checks are true, then that means the tree cannot close
-                                // so we break the loop here.
-                                if queue
-                                    .iter()
-                                    .filter(|x| {
-                                        !self.statement_is_atomic_formula(&x.statement)
-                                            && x.statement_id != statement_id
-                                    })
-                                    .count()
-                                    == 0
-                                {
+                                // loop when the tree doesn't close.
+
+                                // Check if we haven't tried every other rule and some didn't fail
+                                // If they all failed, we might as well stop now
+                                if !queue.iter().any(|x| !x.failed_last) {
                                     break;
                                 }
 
                                 // FIXME This doesn't solve infinitely recursive trees
-                                // (e.g. when there IS more than one compound formula,
-                                // but none are capable of closing the tree)
+                                // where you're stuck in a cycle of EQ -> UQ -> EQ
                             }
+
+                            // Since we've reached here, there are other rules that may yet be applied
+                            // What happens now is the algorithm iterates over the queue, and if no
+                            // other rule can be applied, the code above will break the loop and finish
+                            // For now, let us tell the algorithm at least this rule failed
+
+                            // Important: we won't run into an infinite loop where there are branching rules
+                            // to be applied but that can't because the queue pops UQ first all the time,
+                            // because the impl for the Ord trait on QueueNode makes sure that if
+                            // the rule has failed_last set, it'll always come after ALL other rules.
+                            // Since UQ is the only repeat rule, we're safe
+                            failed_last = true;
                         }
                     }
 
-                    if rule.1 {
+                    if repeat {
                         // See right above, if we reached here, we're safe
                         queue.push(QueueNode {
                             statement_id,
                             statement,
-                            rule: Some(rule),
+                            rule: Some((rule.clone(), repeat)),
                             branch_id,
+                            failed_last: failed_last,
                         });
                     }
                 }
@@ -286,20 +304,6 @@ impl TruthTreeMethod {
         }
 
         self.tree
-    }
-
-    fn statement_is_atomic_formula(&self, statement: &Statement) -> bool {
-        // An atomic formula in a truth tree is any simple/singular statement
-        // or its negation, and nothing else.
-
-        match statement {
-            Statement::Simple(_) | Statement::Singular(_, _) => true,
-            Statement::LogicalNegation(ref rst) => match **rst {
-                Statement::Simple(_) | Statement::Singular(_, _) => true,
-                _ => false,
-            },
-            _ => false,
-        }
     }
 
     fn statement_is_contradiction(&self, statement: &Statement, branch_id: &Id) -> bool {
@@ -971,6 +975,7 @@ mod tests {
             statement: mock_statement.clone(),
             rule: Some((Rule::Conjunction, false)),
             branch_id: mock_id.clone(),
+            failed_last: false,
         });
 
         queue.push(QueueNode {
@@ -978,6 +983,7 @@ mod tests {
             statement: mock_statement.clone(),
             rule: Some((Rule::QuantifierExchange, false)),
             branch_id: mock_id.clone(),
+            failed_last: false,
         });
 
         queue.push(QueueNode {
@@ -985,6 +991,7 @@ mod tests {
             statement: mock_statement.clone(),
             rule: Some((Rule::DoubleNegation, false)),
             branch_id: mock_id.clone(),
+            failed_last: false,
         });
 
         queue.push(QueueNode {
@@ -992,6 +999,7 @@ mod tests {
             statement: mock_statement.clone(),
             rule: Some((Rule::ExistentialQuantifier, false)),
             branch_id: mock_id.clone(),
+            failed_last: false,
         });
 
         queue.push(QueueNode {
@@ -999,6 +1007,7 @@ mod tests {
             statement: mock_statement.clone(),
             rule: Some((Rule::NegationOfDisjunction, false)),
             branch_id: mock_id.clone(),
+            failed_last: false,
         });
 
         queue.push(QueueNode {
@@ -1006,6 +1015,7 @@ mod tests {
             statement: mock_statement.clone(),
             rule: Some((Rule::Disjunction, false)),
             branch_id: mock_id.clone(),
+            failed_last: false,
         });
 
         queue.push(QueueNode {
@@ -1013,6 +1023,7 @@ mod tests {
             statement: mock_statement.clone(),
             rule: Some((Rule::UniversalQuantifier, true)),
             branch_id: mock_id.clone(),
+            failed_last: false,
         });
 
         queue.push(QueueNode {
@@ -1020,6 +1031,7 @@ mod tests {
             statement: mock_statement.clone(),
             rule: Some((Rule::NegationOfConjunction, false)),
             branch_id: mock_id.clone(),
+            failed_last: false,
         });
 
         queue.push(QueueNode {
@@ -1027,6 +1039,7 @@ mod tests {
             statement: mock_statement.clone(),
             rule: Some((Rule::NegationOfConditional, false)),
             branch_id: mock_id.clone(),
+            failed_last: false,
         });
 
         queue.push(QueueNode {
@@ -1034,6 +1047,7 @@ mod tests {
             statement: mock_statement.clone(),
             rule: Some((Rule::Conditional, false)),
             branch_id: mock_id.clone(),
+            failed_last: false,
         });
 
         assert_eq!(
@@ -1933,5 +1947,40 @@ mod tests {
                 ]
             )
         );
+    }
+
+    // TEST TEST
+    #[test]
+    fn handles_some_potential_infinite_loops() {
+        let truth_tree_method = TruthTreeMethod::new(&vec![Statement::LogicalConditional(
+            Box::new(Statement::Universal(
+                Variable('x', Subscript(None)),
+                Box::new(Formula::Conditional(
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('D', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('P', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                )),
+            )),
+            Box::new(Statement::Universal(
+                Variable('x', Subscript(None)),
+                Box::new(Formula::Conditional(
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('S', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('P', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                )),
+            )),
+        )]);
+
+        truth_tree_method.compute();
     }
 }

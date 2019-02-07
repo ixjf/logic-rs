@@ -3,8 +3,16 @@ use super::ast::{
     Statement, Subscript, Term, Variable,
 };
 use super::error::Error;
-use super::pest_parser::{GeneratedParser, Rule};
 use pest::iterators::{Pair, Pairs};
+
+mod pest_parser {
+    #[derive(Parser)]
+    #[grammar = "parser/grammar/GRAMMAR.pest"]
+    pub struct GeneratedParser;
+}
+
+use pest_parser::GeneratedParser;
+pub use pest_parser::Rule;
 
 pub struct Parser {}
 

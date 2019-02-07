@@ -1,7 +1,6 @@
 mod ast;
 mod error;
 mod parser;
-mod pest_parser;
 
 pub use ast::{
     Degree, Formula, Input, ParseTree, PredicateLetter, SimpleStatementLetter, SingularTerm,

@@ -1,4 +1,4 @@
-use super::pest_parser::Rule;
+use super::parser::Rule;
 use pest::error::Error as pest_error;
 use pest::error::ErrorVariant as pest_error_variant;
 use pest::Span;
