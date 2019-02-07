@@ -23,21 +23,39 @@ pub enum Rule {
 struct QueueNode {
     statement_id: Id,
     statement: Statement,
-    rule: Option<Rule>,
+    rule: Option<(Rule, bool)>,
     branch_id: Id,
 }
 
 impl Ord for QueueNode {
     fn cmp(&self, other: &QueueNode) -> Ordering {
         // Priority order, top should come first, bottom last
+        // There is a reason for this order.
+        // 1. QE can potentially add new EQs to the tree
+        // and EQs add new singular terms. This one is mostly just
+        // to keep in line with the book. When writing a truth tree by hand,
+        // keeping track of UQ rules applied can get difficult.
+        // 2. EQ adds new singular terms, which UQ depends on.
+        // The sooner we add those singular terms to the stack,
+        // the sooner we may be able to close the tree
+        // 3. UQ should come last out of all branching rules
+        // since we want to apply UQ to one singular term and move on,
+        // and come back later (if we instantiate UQ to all singular terms
+        // on the branch at once, we then can't close the tree until
+        // we apply rules to all those new statements). But if this rule
+        // doesn't have lower priority than the other non-branching rules,
+        // then as soon as we add it to the queue, it will be popped,
+        // since it'll be the first one out.
+        // 4. Non-branching rules before branching rules because, again,
+        // we want to keep the truth tree as compact as possible
         let rule_priority_order: [Rule; 10] = [
             Rule::QuantifierExchange,
             Rule::ExistentialQuantifier,
-            Rule::UniversalQuantifier,
             Rule::DoubleNegation,
             Rule::Conjunction,
             Rule::NegationOfConditional,
             Rule::NegationOfDisjunction,
+            Rule::UniversalQuantifier,
             Rule::Conditional,
             Rule::NegationOfConjunction,
             Rule::Disjunction,
@@ -51,12 +69,12 @@ impl Ord for QueueNode {
             // then A should come first
             (Some(rule_a), Some(rule_b)) => rule_priority_order
                 .iter()
-                .position(|x| *x == *rule_b)
+                .position(|x| *x == rule_b.0)
                 .unwrap()
                 .cmp(
                     &rule_priority_order
                         .iter()
-                        .position(|x| *x == *rule_a)
+                        .position(|x| *x == rule_a.0)
                         .unwrap(),
                 ),
             (None, None) => Ordering::Equal,
@@ -70,14 +88,14 @@ impl PartialOrd for QueueNode {
     }
 }
 
-enum DerivedRuleWhatdo {
+enum ApplyRuleWhatdo {
     AddToExistingBranches,
     AsNewBranches,
 }
 
 struct RuleDeriveResult {
     statements: Vec<Statement>,
-    whatdo: DerivedRuleWhatdo,
+    whatdo: ApplyRuleWhatdo,
 }
 
 pub struct TruthTreeMethod {
@@ -134,83 +152,127 @@ impl TruthTreeMethod {
 
             match rule {
                 Some(rule) => {
-                    let result = self.apply_rule(rule.clone(), &statement, &branch_id);
+                    match self.apply_rule(rule.clone().0, &statement, &branch_id) {
+                        Some(result) => {
+                            // Open child branches of branch where original statement is
+                            let open_branches_ids = self
+                                .tree
+                                .traverse_downwards_branch_ids(&branch_id)
+                                .filter(|x| {
+                                    !self.tree.branch_from_id(&x).is_closed()
+                                        && self.tree.branch_is_last_child(&x)
+                                })
+                                .collect::<Vec<_>>();
 
-                    // Open child branches of branch where original statement is
-                    let open_branches_ids = self
-                        .tree
-                        .traverse_downwards_branch_ids(&branch_id)
-                        .filter(|x| {
-                            !self.tree.branch_from_id(&x).is_closed()
-                                && self.tree.branch_is_last_child(&x)
-                        })
-                        .collect::<Vec<_>>();
+                            for child_branch_id in open_branches_ids {
+                                for x in &result.statements {
+                                    let (derived_statement_id, derived_statement_branch_id) = {
+                                        match result.whatdo {
+                                            ApplyRuleWhatdo::AddToExistingBranches => {
+                                                // Add derived statement to all open child branches of branch_id
+                                                // at the end of the tree (i.e. child branches that have no children)
+                                                let new_statement_id = self
+                                                    .tree
+                                                    .branch_from_id_mut(&child_branch_id)
+                                                    .append_statement(BranchNode {
+                                                        statement: x.clone(),
+                                                        derived_from: Some((
+                                                            BranchNodeLocation {
+                                                                node_id: statement_id.clone(),
+                                                                branch_id: branch_id.clone(),
+                                                            },
+                                                            rule.clone().0,
+                                                        )),
+                                                    });
 
-                    for child_branch_id in open_branches_ids {
-                        for x in &result.statements {
-                            let (derived_statement_id, derived_statement_branch_id) = {
-                                match result.whatdo {
-                                    DerivedRuleWhatdo::AddToExistingBranches => {
-                                        // Add derived statement to all open child branches of branch_id
-                                        // at the end of the tree (i.e. child branches that have no children)
-                                        let new_statement_id = self
-                                            .tree
-                                            .branch_from_id_mut(&child_branch_id)
-                                            .append_statement(BranchNode {
-                                                statement: x.clone(),
-                                                derived_from: Some((
-                                                    BranchNodeLocation {
-                                                        node_id: statement_id.clone(),
-                                                        branch_id: branch_id.clone(),
-                                                    },
-                                                    rule.clone(),
-                                                )),
-                                            });
+                                                (new_statement_id, child_branch_id.clone())
+                                            }
 
-                                        (new_statement_id, child_branch_id.clone())
-                                    }
+                                            ApplyRuleWhatdo::AsNewBranches => {
+                                                // Each derived statement will create a new child branch on every open
+                                                // branch of branch_id that is at the end of the tree
+                                                let new_branch = Branch::new(vec![BranchNode {
+                                                    statement: x.clone(),
+                                                    derived_from: Some((
+                                                        BranchNodeLocation {
+                                                            node_id: statement_id.clone(),
+                                                            branch_id: branch_id.clone(),
+                                                        },
+                                                        rule.clone().0,
+                                                    )),
+                                                }]);
 
-                                    DerivedRuleWhatdo::AsNewBranches => {
-                                        // Each derived statement will create a new child branch on every open
-                                        // branch of branch_id that is at the end of the tree
-                                        let new_branch = Branch::new(vec![BranchNode {
-                                            statement: x.clone(),
-                                            derived_from: Some((
-                                                BranchNodeLocation {
-                                                    node_id: statement_id.clone(),
-                                                    branch_id: branch_id.clone(),
-                                                },
-                                                rule.clone(),
-                                            )),
-                                        }]);
+                                                let root_statement_id =
+                                                    new_branch.statement_ids().next().unwrap();
 
-                                        let root_statement_id =
-                                            new_branch.statement_ids().next().unwrap();
+                                                let new_branch_id = self
+                                                    .tree
+                                                    .append_branch_at(new_branch, &child_branch_id);
 
-                                        let new_branch_id = self
-                                            .tree
-                                            .append_branch_at(new_branch, &child_branch_id);
+                                                (root_statement_id, new_branch_id.clone())
+                                            }
+                                        }
+                                    };
 
-                                        (root_statement_id, new_branch_id.clone())
-                                    }
+                                    // Add derived statement to queue for further processing
+                                    let new_node = QueueNode {
+                                        statement_id: derived_statement_id,
+                                        statement: x.clone(),
+                                        rule: self.matches_some_rule(&x),
+                                        branch_id: derived_statement_branch_id.clone(),
+                                    };
+                                    queue.push(new_node);
                                 }
-                            };
-
-                            // Add derived statement to queue for further processing
-                            let new_node = QueueNode {
-                                statement_id: derived_statement_id,
-                                statement: x.clone(),
-                                rule: self.matches_some_rule(&x),
-                                branch_id: derived_statement_branch_id.clone(),
-                            };
-                            queue.push(new_node);
+                            }
                         }
+                        None => {
+                            // Rule didn't need to be applied
+
+                            if rule.1 {
+                                // Some rules can be reapplied over and over (i.e. UQ)
+                                // If this is the case, we readd this node to the queue
+
+                                // However, if we don't do anything else, we will run into an infinite
+                                // loop when the tree doesn't close. So what we need to do here is check
+                                // if there are no compound formulas left with rules to apply
+                                // (other than the current rule)
+                                // AND that it isn't possible to apply this rule anymore (which we know
+                                // because we've reached this 'None' - i.e. rule didn't apply)
+                                // If both of these checks are true, then that means the tree cannot close
+                                // so we break the loop here.
+                                if queue
+                                    .iter()
+                                    .filter(|x| {
+                                        !self.statement_is_atomic_formula(&x.statement)
+                                            && x.statement_id != statement_id
+                                    })
+                                    .count()
+                                    == 0
+                                {
+                                    break;
+                                }
+
+                                // FIXME This doesn't solve infinitely recursive trees
+                                // (e.g. when there IS more than one compound formula,
+                                // but none are capable of closing the tree)
+                            }
+                        }
+                    }
+
+                    if rule.1 {
+                        // See right above, if we reached here, we're safe
+                        queue.push(QueueNode {
+                            statement_id,
+                            statement,
+                            rule: Some(rule),
+                            branch_id,
+                        });
                     }
                 }
                 None => {
                     // No rule to apply (statement is already atomic formula),
                     // statement is already on tree, so we do nothing here
-                    // except checking for contradictions
+                    // except checking for contradiction
                     if self.statement_is_contradiction(&statement, &branch_id) {
                         self.tree.branch_from_id_mut(&branch_id).close();
                         continue;
@@ -224,6 +286,20 @@ impl TruthTreeMethod {
         }
 
         self.tree
+    }
+
+    fn statement_is_atomic_formula(&self, statement: &Statement) -> bool {
+        // An atomic formula in a truth tree is any simple/singular statement
+        // or its negation, and nothing else.
+
+        match statement {
+            Statement::Simple(_) | Statement::Singular(_, _) => true,
+            Statement::LogicalNegation(ref rst) => match **rst {
+                Statement::Simple(_) | Statement::Singular(_, _) => true,
+                _ => false,
+            },
+            _ => false,
+        }
     }
 
     fn statement_is_contradiction(&self, statement: &Statement, branch_id: &Id) -> bool {
@@ -255,27 +331,27 @@ impl TruthTreeMethod {
         false
     }
 
-    fn matches_some_rule(&self, statement: &Statement) -> Option<Rule> {
+    fn matches_some_rule(&self, statement: &Statement) -> Option<(Rule, bool)> {
         if self.can_apply_qe_rule(&statement) {
-            Some(Rule::QuantifierExchange)
+            Some((Rule::QuantifierExchange, false))
         } else if self.can_apply_eq_rule(&statement) {
-            Some(Rule::ExistentialQuantifier)
+            Some((Rule::ExistentialQuantifier, false))
         } else if self.can_apply_uq_rule(&statement) {
-            Some(Rule::UniversalQuantifier)
+            Some((Rule::UniversalQuantifier, true))
         } else if self.can_apply_double_negation_rule(&statement) {
-            Some(Rule::DoubleNegation)
+            Some((Rule::DoubleNegation, false))
         } else if self.can_apply_conjunction_rule(&statement) {
-            Some(Rule::Conjunction)
+            Some((Rule::Conjunction, false))
         } else if self.can_apply_negation_of_conditional_rule(&statement) {
-            Some(Rule::NegationOfConditional)
+            Some((Rule::NegationOfConditional, false))
         } else if self.can_apply_negation_of_disjunction_rule(&statement) {
-            Some(Rule::NegationOfDisjunction)
+            Some((Rule::NegationOfDisjunction, false))
         } else if self.can_apply_conditional_rule(&statement) {
-            Some(Rule::Conditional)
+            Some((Rule::Conditional, false))
         } else if self.can_apply_negation_of_conjunction_rule(&statement) {
-            Some(Rule::NegationOfConjunction)
+            Some((Rule::NegationOfConjunction, false))
         } else if self.can_apply_disjunction_rule(&statement) {
-            Some(Rule::Disjunction)
+            Some((Rule::Disjunction, false))
         } else {
             None
         }
@@ -366,7 +442,12 @@ impl TruthTreeMethod {
         }
     }
 
-    fn apply_rule(&self, rule: Rule, statement: &Statement, branch_id: &Id) -> RuleDeriveResult {
+    fn apply_rule(
+        &self,
+        rule: Rule,
+        statement: &Statement,
+        branch_id: &Id,
+    ) -> Option<RuleDeriveResult> {
         match rule {
             Rule::QuantifierExchange => self.apply_qe_rule(&statement),
             Rule::ExistentialQuantifier => self.apply_eq_rule(&statement, &branch_id),
@@ -381,175 +462,184 @@ impl TruthTreeMethod {
         }
     }
 
-    fn apply_qe_rule(&self, statement: &Statement) -> RuleDeriveResult {
+    fn apply_qe_rule(&self, statement: &Statement) -> Option<RuleDeriveResult> {
         match statement {
             Statement::LogicalNegation(ref rst) => match **rst {
-                Statement::Existential(ref var, ref formula) => RuleDeriveResult {
+                Statement::Existential(ref var, ref formula) => Some(RuleDeriveResult {
                     statements: vec![Statement::Universal(
                         var.clone(),
                         Box::new(Formula::Negation(Box::new(*formula.clone()))),
                     )],
-                    whatdo: DerivedRuleWhatdo::AddToExistingBranches,
-                },
-                Statement::Universal(ref var, ref formula) => RuleDeriveResult {
+                    whatdo: ApplyRuleWhatdo::AddToExistingBranches,
+                }),
+                Statement::Universal(ref var, ref formula) => Some(RuleDeriveResult {
                     statements: vec![Statement::Existential(
                         var.clone(),
                         Box::new(Formula::Negation(Box::new(*formula.clone()))),
                     )],
-                    whatdo: DerivedRuleWhatdo::AddToExistingBranches,
-                },
+                    whatdo: ApplyRuleWhatdo::AddToExistingBranches,
+                }),
                 _ => panic!("attempt to apply wrong rule to statement"),
             },
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
 
-    fn apply_eq_rule(&self, statement: &Statement, branch_id: &Id) -> RuleDeriveResult {
+    fn apply_eq_rule(&self, statement: &Statement, branch_id: &Id) -> Option<RuleDeriveResult> {
         match statement {
-            Statement::Existential(_, _) => RuleDeriveResult {
+            Statement::Existential(_, _) => Some(RuleDeriveResult {
                 statements: vec![self.instantiate_quantified_statement(
                     &statement,
                     &self.first_unused_in_singular_term_stack(
                         &self.build_singular_term_stack_for_branch(&branch_id),
                     ),
                 )],
-                whatdo: DerivedRuleWhatdo::AddToExistingBranches,
-            },
+                whatdo: ApplyRuleWhatdo::AddToExistingBranches,
+            }),
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
 
-    fn apply_uq_rule(&self, statement: &Statement, branch_id: &Id) -> RuleDeriveResult {
+    fn apply_uq_rule(&self, statement: &Statement, branch_id: &Id) -> Option<RuleDeriveResult> {
         match statement {
             Statement::Universal(_, _) => {
-                // Build a list of all singular terms which we haven't instantiated
-                // this universal statement to yet
+                // Find some singular term which we haven't instantiated this universal
+                // statement to yet
                 //
                 // If there are no singular terms in this branch at all,
                 // pick a random one
+                //
+                // This rule only instantiates to one singular term at a time
+                // in order to avoid unnecessarily long truth trees
                 let stack = self.build_singular_term_stack_for_branch(&branch_id);
 
-                let new_singular_terms = if stack.is_empty() {
-                    vec![self.first_unused_in_singular_term_stack(&stack)]
+                let new_singular_term = if stack.is_empty() {
+                    Some(self.first_unused_in_singular_term_stack(&stack))
                 } else {
-                    stack
-                        .iter()
-                        .cloned()
-                        .filter(|x| {
-                            let instantiated_statement =
-                                self.instantiate_quantified_statement(&statement, &x);
+                    stack.iter().cloned().find(|x| {
+                        let instantiated_statement =
+                            self.instantiate_quantified_statement(&statement, &x);
 
-                            for (_, ancestor_branch) in
-                                self.tree.traverse_upwards_branches(&branch_id)
-                            {
-                                for (_, tree_node) in ancestor_branch.statements() {
-                                    if instantiated_statement == tree_node.statement {
-                                        return false;
-                                    }
+                        for (_, ancestor_branch) in self.tree.traverse_upwards_branches(&branch_id)
+                        {
+                            for (_, tree_node) in ancestor_branch.statements() {
+                                if instantiated_statement == tree_node.statement {
+                                    return false;
                                 }
                             }
+                        }
 
-                            true
-                        })
-                        .collect::<Vec<_>>()
+                        true
+                    })
                 };
 
-                RuleDeriveResult {
-                    statements: new_singular_terms
-                        .iter()
-                        .map(|x| self.instantiate_quantified_statement(&statement, &x))
-                        .collect(),
-                    whatdo: DerivedRuleWhatdo::AddToExistingBranches,
+                match new_singular_term {
+                    Some(s) => Some(RuleDeriveResult {
+                        statements: vec![self.instantiate_quantified_statement(&statement, &s)],
+                        whatdo: ApplyRuleWhatdo::AddToExistingBranches,
+                    }),
+                    None => None,
                 }
             }
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
 
-    fn apply_double_negation_rule(&self, statement: &Statement) -> RuleDeriveResult {
+    fn apply_double_negation_rule(&self, statement: &Statement) -> Option<RuleDeriveResult> {
         match statement {
             Statement::LogicalNegation(ref rst) => match **rst {
-                Statement::LogicalNegation(ref inner_rst) => RuleDeriveResult {
+                Statement::LogicalNegation(ref inner_rst) => Some(RuleDeriveResult {
                     statements: vec![*inner_rst.clone()],
-                    whatdo: DerivedRuleWhatdo::AddToExistingBranches,
-                },
+                    whatdo: ApplyRuleWhatdo::AddToExistingBranches,
+                }),
                 _ => panic!("attempt to apply wrong rule to statement"),
             },
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
 
-    fn apply_conjunction_rule(&self, statement: &Statement) -> RuleDeriveResult {
+    fn apply_conjunction_rule(&self, statement: &Statement) -> Option<RuleDeriveResult> {
         match statement {
-            Statement::LogicalConjunction(ref lst, ref rst) => RuleDeriveResult {
+            Statement::LogicalConjunction(ref lst, ref rst) => Some(RuleDeriveResult {
                 statements: vec![*lst.clone(), *rst.clone()],
-                whatdo: DerivedRuleWhatdo::AddToExistingBranches,
-            },
+                whatdo: ApplyRuleWhatdo::AddToExistingBranches,
+            }),
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
 
-    fn apply_negation_of_conditional_rule(&self, statement: &Statement) -> RuleDeriveResult {
+    fn apply_negation_of_conditional_rule(
+        &self,
+        statement: &Statement,
+    ) -> Option<RuleDeriveResult> {
         match statement {
             Statement::LogicalNegation(ref rst) => match **rst {
-                Statement::LogicalConditional(ref lst, ref rst) => RuleDeriveResult {
+                Statement::LogicalConditional(ref lst, ref rst) => Some(RuleDeriveResult {
                     statements: vec![*lst.clone(), Statement::LogicalNegation(rst.clone())],
-                    whatdo: DerivedRuleWhatdo::AddToExistingBranches,
-                },
+                    whatdo: ApplyRuleWhatdo::AddToExistingBranches,
+                }),
                 _ => panic!("attempt to apply wrong rule to statement"),
             },
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
 
-    fn apply_negation_of_disjunction_rule(&self, statement: &Statement) -> RuleDeriveResult {
+    fn apply_negation_of_disjunction_rule(
+        &self,
+        statement: &Statement,
+    ) -> Option<RuleDeriveResult> {
         match statement {
             Statement::LogicalNegation(ref rst) => match **rst {
-                Statement::LogicalDisjunction(ref lst, ref rst) => RuleDeriveResult {
+                Statement::LogicalDisjunction(ref lst, ref rst) => Some(RuleDeriveResult {
                     statements: vec![
                         Statement::LogicalNegation(lst.clone()),
                         Statement::LogicalNegation(rst.clone()),
                     ],
-                    whatdo: DerivedRuleWhatdo::AddToExistingBranches,
-                },
+                    whatdo: ApplyRuleWhatdo::AddToExistingBranches,
+                }),
                 _ => panic!("attempt to apply wrong rule to statement"),
             },
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
 
-    fn apply_conditional_rule(&self, statement: &Statement) -> RuleDeriveResult {
+    fn apply_conditional_rule(&self, statement: &Statement) -> Option<RuleDeriveResult> {
         match statement {
-            Statement::LogicalConditional(ref lst, ref rst) => RuleDeriveResult {
+            Statement::LogicalConditional(ref lst, ref rst) => Some(RuleDeriveResult {
                 statements: vec![Statement::LogicalNegation(lst.clone()), *rst.clone()],
-                whatdo: DerivedRuleWhatdo::AsNewBranches,
-            },
+                whatdo: ApplyRuleWhatdo::AsNewBranches,
+            }),
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
 
-    fn apply_negation_of_conjunction_rule(&self, statement: &Statement) -> RuleDeriveResult {
+    fn apply_negation_of_conjunction_rule(
+        &self,
+        statement: &Statement,
+    ) -> Option<RuleDeriveResult> {
         match statement {
             Statement::LogicalNegation(ref rst) => match **rst {
-                Statement::LogicalConjunction(ref inner_lst, ref inner_rst) => RuleDeriveResult {
-                    statements: vec![
-                        Statement::LogicalNegation(inner_lst.clone()),
-                        Statement::LogicalNegation(inner_rst.clone()),
-                    ],
-                    whatdo: DerivedRuleWhatdo::AsNewBranches,
-                },
+                Statement::LogicalConjunction(ref inner_lst, ref inner_rst) => {
+                    Some(RuleDeriveResult {
+                        statements: vec![
+                            Statement::LogicalNegation(inner_lst.clone()),
+                            Statement::LogicalNegation(inner_rst.clone()),
+                        ],
+                        whatdo: ApplyRuleWhatdo::AsNewBranches,
+                    })
+                }
                 _ => panic!("attempt to apply wrong rule to statement"),
             },
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
 
-    fn apply_disjunction_rule(&self, statement: &Statement) -> RuleDeriveResult {
+    fn apply_disjunction_rule(&self, statement: &Statement) -> Option<RuleDeriveResult> {
         match statement {
-            Statement::LogicalDisjunction(ref lst, ref rst) => RuleDeriveResult {
+            Statement::LogicalDisjunction(ref lst, ref rst) => Some(RuleDeriveResult {
                 statements: vec![*lst.clone(), *rst.clone()],
-                whatdo: DerivedRuleWhatdo::AsNewBranches,
-            },
+                whatdo: ApplyRuleWhatdo::AsNewBranches,
+            }),
             _ => panic!("attempt to apply wrong rule to statement"),
         }
     }
@@ -879,83 +969,104 @@ mod tests {
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::Conjunction),
+            rule: Some((Rule::Conjunction, false)),
             branch_id: mock_id.clone(),
         });
 
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::QuantifierExchange),
+            rule: Some((Rule::QuantifierExchange, false)),
             branch_id: mock_id.clone(),
         });
 
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::DoubleNegation),
+            rule: Some((Rule::DoubleNegation, false)),
             branch_id: mock_id.clone(),
         });
 
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::ExistentialQuantifier),
+            rule: Some((Rule::ExistentialQuantifier, false)),
             branch_id: mock_id.clone(),
         });
 
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::NegationOfDisjunction),
+            rule: Some((Rule::NegationOfDisjunction, false)),
             branch_id: mock_id.clone(),
         });
 
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::Disjunction),
+            rule: Some((Rule::Disjunction, false)),
             branch_id: mock_id.clone(),
         });
 
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::UniversalQuantifier),
+            rule: Some((Rule::UniversalQuantifier, true)),
             branch_id: mock_id.clone(),
         });
 
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::NegationOfConjunction),
+            rule: Some((Rule::NegationOfConjunction, false)),
             branch_id: mock_id.clone(),
         });
 
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::NegationOfConditional),
+            rule: Some((Rule::NegationOfConditional, false)),
             branch_id: mock_id.clone(),
         });
 
         queue.push(QueueNode {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
-            rule: Some(Rule::Conditional),
+            rule: Some((Rule::Conditional, false)),
             branch_id: mock_id.clone(),
         });
 
-        assert_eq!(queue.pop().unwrap().rule, Some(Rule::QuantifierExchange));
-        assert_eq!(queue.pop().unwrap().rule, Some(Rule::ExistentialQuantifier));
-        assert_eq!(queue.pop().unwrap().rule, Some(Rule::UniversalQuantifier));
-        assert_eq!(queue.pop().unwrap().rule, Some(Rule::DoubleNegation));
-        assert_eq!(queue.pop().unwrap().rule, Some(Rule::Conjunction));
-        assert_eq!(queue.pop().unwrap().rule, Some(Rule::NegationOfConditional));
-        assert_eq!(queue.pop().unwrap().rule, Some(Rule::NegationOfDisjunction));
-        assert_eq!(queue.pop().unwrap().rule, Some(Rule::Conditional));
-        assert_eq!(queue.pop().unwrap().rule, Some(Rule::NegationOfConjunction));
-        assert_eq!(queue.pop().unwrap().rule, Some(Rule::Disjunction));
+        assert_eq!(
+            queue.pop().unwrap().rule,
+            Some((Rule::QuantifierExchange, false))
+        );
+        assert_eq!(
+            queue.pop().unwrap().rule,
+            Some((Rule::ExistentialQuantifier, false))
+        );
+        assert_eq!(
+            queue.pop().unwrap().rule,
+            Some((Rule::DoubleNegation, false))
+        );
+        assert_eq!(queue.pop().unwrap().rule, Some((Rule::Conjunction, false)));
+        assert_eq!(
+            queue.pop().unwrap().rule,
+            Some((Rule::NegationOfConditional, false))
+        );
+        assert_eq!(
+            queue.pop().unwrap().rule,
+            Some((Rule::NegationOfDisjunction, false))
+        );
+        assert_eq!(
+            queue.pop().unwrap().rule,
+            Some((Rule::UniversalQuantifier, true))
+        );
+        assert_eq!(queue.pop().unwrap().rule, Some((Rule::Conditional, false)));
+        assert_eq!(
+            queue.pop().unwrap().rule,
+            Some((Rule::NegationOfConjunction, false))
+        );
+        assert_eq!(queue.pop().unwrap().rule, Some((Rule::Disjunction, false)));
     }
 
     #[test]
@@ -1002,7 +1113,7 @@ mod tests {
                     ))
                 )
             ))),
-            Some(Rule::QuantifierExchange)
+            Some((Rule::QuantifierExchange, false))
         );
 
         assert_eq!(
@@ -1015,7 +1126,7 @@ mod tests {
                     ))
                 )
             ))),
-            Some(Rule::QuantifierExchange)
+            Some((Rule::QuantifierExchange, false))
         );
 
         assert_eq!(
@@ -1026,7 +1137,7 @@ mod tests {
                     vec![Term::Variable(Variable('x', Subscript(None)))]
                 ))
             )),
-            Some(Rule::ExistentialQuantifier)
+            Some((Rule::ExistentialQuantifier, false))
         );
 
         assert_eq!(
@@ -1037,7 +1148,7 @@ mod tests {
                     vec![Term::Variable(Variable('x', Subscript(None)))]
                 ))
             )),
-            Some(Rule::UniversalQuantifier)
+            Some((Rule::UniversalQuantifier, true))
         );
 
         assert_eq!(
@@ -1047,7 +1158,7 @@ mod tests {
                     Subscript(None)
                 ))))
             ))),
-            Some(Rule::DoubleNegation)
+            Some((Rule::DoubleNegation, false))
         );
 
         assert_eq!(
@@ -1061,7 +1172,7 @@ mod tests {
                     Subscript(None)
                 )))
             )),
-            Some(Rule::Conjunction)
+            Some((Rule::Conjunction, false))
         );
 
         assert_eq!(
@@ -1077,7 +1188,7 @@ mod tests {
                     )))
                 )
             ))),
-            Some(Rule::NegationOfConditional)
+            Some((Rule::NegationOfConditional, false))
         );
 
         assert_eq!(
@@ -1093,7 +1204,7 @@ mod tests {
                     )))
                 )
             ))),
-            Some(Rule::NegationOfDisjunction)
+            Some((Rule::NegationOfDisjunction, false))
         );
 
         assert_eq!(
@@ -1107,7 +1218,7 @@ mod tests {
                     Subscript(None)
                 )))
             )),
-            Some(Rule::Conditional)
+            Some((Rule::Conditional, false))
         );
 
         assert_eq!(
@@ -1123,7 +1234,7 @@ mod tests {
                     )))
                 )
             ))),
-            Some(Rule::NegationOfConjunction)
+            Some((Rule::NegationOfConjunction, false))
         );
 
         assert_eq!(
@@ -1137,7 +1248,7 @@ mod tests {
                     Subscript(None)
                 )))
             )),
-            Some(Rule::Disjunction)
+            Some((Rule::Disjunction, false))
         );
 
         assert_eq!(
@@ -1155,17 +1266,19 @@ mod tests {
             SimpleStatementLetter('A', Subscript(None)),
         )]);
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::QuantifierExchange,
-            &Statement::LogicalNegation(Box::new(Statement::Existential(
-                Variable('x', Subscript(None)),
-                Box::new(Formula::Predicate(
-                    PredicateLetter('B', Subscript(None), Degree(1)),
-                    vec![Term::Variable(Variable('x', Subscript(None)))],
-                )),
-            ))),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::QuantifierExchange,
+                &Statement::LogicalNegation(Box::new(Statement::Existential(
+                    Variable('x', Subscript(None)),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('B', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                ))),
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 1);
         assert_eq!(
@@ -1179,21 +1292,23 @@ mod tests {
             )
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => {}
-            DerivedRuleWhatdo::AsNewBranches => assert!(false),
+            ApplyRuleWhatdo::AddToExistingBranches => {}
+            ApplyRuleWhatdo::AsNewBranches => assert!(false),
         }
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::QuantifierExchange,
-            &Statement::LogicalNegation(Box::new(Statement::Universal(
-                Variable('x', Subscript(None)),
-                Box::new(Formula::Predicate(
-                    PredicateLetter('B', Subscript(None), Degree(1)),
-                    vec![Term::Variable(Variable('x', Subscript(None)))],
-                )),
-            ))),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::QuantifierExchange,
+                &Statement::LogicalNegation(Box::new(Statement::Universal(
+                    Variable('x', Subscript(None)),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('B', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                ))),
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 1);
         assert_eq!(
@@ -1207,8 +1322,8 @@ mod tests {
             )
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => {}
-            DerivedRuleWhatdo::AsNewBranches => assert!(false),
+            ApplyRuleWhatdo::AddToExistingBranches => {}
+            ApplyRuleWhatdo::AsNewBranches => assert!(false),
         }
     }
 
@@ -1218,17 +1333,19 @@ mod tests {
             SimpleStatementLetter('A', Subscript(None)),
         )]);
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::ExistentialQuantifier,
-            &Statement::Existential(
-                Variable('x', Subscript(None)),
-                Box::new(Formula::Predicate(
-                    PredicateLetter('B', Subscript(None), Degree(1)),
-                    vec![Term::Variable(Variable('x', Subscript(None)))],
-                )),
-            ),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::ExistentialQuantifier,
+                &Statement::Existential(
+                    Variable('x', Subscript(None)),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('B', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                ),
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 1);
         assert_eq!(
@@ -1239,8 +1356,8 @@ mod tests {
             )
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => {}
-            DerivedRuleWhatdo::AsNewBranches => assert!(false),
+            ApplyRuleWhatdo::AddToExistingBranches => {}
+            ApplyRuleWhatdo::AsNewBranches => assert!(false),
         }
     }
 
@@ -1252,17 +1369,19 @@ mod tests {
 
         // If no singular term appears on the branch yet, instantiates to random one
         // (algorithm dictates first one will be 'a')
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::UniversalQuantifier,
-            &Statement::Universal(
-                Variable('x', Subscript(None)),
-                Box::new(Formula::Predicate(
-                    PredicateLetter('B', Subscript(None), Degree(1)),
-                    vec![Term::Variable(Variable('x', Subscript(None)))],
-                )),
-            ),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::UniversalQuantifier,
+                &Statement::Universal(
+                    Variable('x', Subscript(None)),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('B', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                ),
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 1);
         assert_eq!(
@@ -1273,11 +1392,11 @@ mod tests {
             )
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => {}
-            DerivedRuleWhatdo::AsNewBranches => assert!(false),
+            ApplyRuleWhatdo::AddToExistingBranches => {}
+            ApplyRuleWhatdo::AsNewBranches => assert!(false),
         }
 
-        // If singular terms already appear on the branch, instantiate to all of them
+        // If singular terms already appear on the branch, instantiate to each one of them at a time
         truth_tree_method
             .tree
             .branch_from_id_mut(&truth_tree_method.tree.main_trunk_id())
@@ -1292,36 +1411,32 @@ mod tests {
                 derived_from: None,
             });
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::UniversalQuantifier,
-            &Statement::Universal(
-                Variable('x', Subscript(None)),
-                Box::new(Formula::Predicate(
-                    PredicateLetter('B', Subscript(None), Degree(1)),
-                    vec![Term::Variable(Variable('x', Subscript(None)))],
-                )),
-            ),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::UniversalQuantifier,
+                &Statement::Universal(
+                    Variable('x', Subscript(None)),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('B', Subscript(None), Degree(1)),
+                        vec![Term::Variable(Variable('x', Subscript(None)))],
+                    )),
+                ),
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
-        assert_eq!(rule_derive_result.statements.len(), 2);
+        assert_eq!(rule_derive_result.statements.len(), 1);
         assert_eq!(
             rule_derive_result.statements.first().unwrap(),
             &Statement::Singular(
                 PredicateLetter('B', Subscript(None), Degree(1)),
-                vec![SingularTerm('a', Subscript(None))]
+                vec![SingularTerm('a', Subscript(None))] // Bound to break if code changes, order may change
             )
         );
-        assert_eq!(
-            rule_derive_result.statements.last().unwrap(),
-            &Statement::Singular(
-                PredicateLetter('B', Subscript(None), Degree(1)),
-                vec![SingularTerm('b', Subscript(None))]
-            )
-        );
+
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => {}
-            DerivedRuleWhatdo::AsNewBranches => assert!(false),
+            ApplyRuleWhatdo::AddToExistingBranches => {}
+            ApplyRuleWhatdo::AsNewBranches => assert!(false),
         }
     }
 
@@ -1331,13 +1446,15 @@ mod tests {
             SimpleStatementLetter('A', Subscript(None)),
         )]);
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::DoubleNegation,
-            &Statement::LogicalNegation(Box::new(Statement::LogicalNegation(Box::new(
-                Statement::Simple(SimpleStatementLetter('B', Subscript(None))),
-            )))),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::DoubleNegation,
+                &Statement::LogicalNegation(Box::new(Statement::LogicalNegation(Box::new(
+                    Statement::Simple(SimpleStatementLetter('B', Subscript(None))),
+                )))),
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 1);
         assert_eq!(
@@ -1345,8 +1462,8 @@ mod tests {
             &Statement::Simple(SimpleStatementLetter('B', Subscript(None)),)
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => {}
-            DerivedRuleWhatdo::AsNewBranches => assert!(false),
+            ApplyRuleWhatdo::AddToExistingBranches => {}
+            ApplyRuleWhatdo::AsNewBranches => assert!(false),
         }
     }
 
@@ -1356,20 +1473,22 @@ mod tests {
             SimpleStatementLetter('A', Subscript(None)),
         )]);
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::Conjunction,
-            &Statement::LogicalConjunction(
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'B',
-                    Subscript(None),
-                ))),
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'A',
-                    Subscript(None),
-                ))),
-            ),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::Conjunction,
+                &Statement::LogicalConjunction(
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'B',
+                        Subscript(None),
+                    ))),
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'A',
+                        Subscript(None),
+                    ))),
+                ),
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 2);
         assert_eq!(
@@ -1381,8 +1500,8 @@ mod tests {
             &Statement::Simple(SimpleStatementLetter('A', Subscript(None)))
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => {}
-            DerivedRuleWhatdo::AsNewBranches => assert!(false),
+            ApplyRuleWhatdo::AddToExistingBranches => {}
+            ApplyRuleWhatdo::AsNewBranches => assert!(false),
         }
     }
 
@@ -1392,20 +1511,22 @@ mod tests {
             SimpleStatementLetter('A', Subscript(None)),
         )]);
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::NegationOfConditional,
-            &Statement::LogicalNegation(Box::new(Statement::LogicalConditional(
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'B',
-                    Subscript(None),
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::NegationOfConditional,
+                &Statement::LogicalNegation(Box::new(Statement::LogicalConditional(
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'B',
+                        Subscript(None),
+                    ))),
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'A',
+                        Subscript(None),
+                    ))),
                 ))),
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'A',
-                    Subscript(None),
-                ))),
-            ))),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 2);
         assert_eq!(
@@ -1420,8 +1541,8 @@ mod tests {
             ))))
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => {}
-            DerivedRuleWhatdo::AsNewBranches => assert!(false),
+            ApplyRuleWhatdo::AddToExistingBranches => {}
+            ApplyRuleWhatdo::AsNewBranches => assert!(false),
         }
     }
 
@@ -1431,20 +1552,22 @@ mod tests {
             SimpleStatementLetter('A', Subscript(None)),
         )]);
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::NegationOfDisjunction,
-            &Statement::LogicalNegation(Box::new(Statement::LogicalDisjunction(
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'B',
-                    Subscript(None),
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::NegationOfDisjunction,
+                &Statement::LogicalNegation(Box::new(Statement::LogicalDisjunction(
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'B',
+                        Subscript(None),
+                    ))),
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'A',
+                        Subscript(None),
+                    ))),
                 ))),
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'A',
-                    Subscript(None),
-                ))),
-            ))),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 2);
         assert_eq!(
@@ -1462,8 +1585,8 @@ mod tests {
             ))))
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => {}
-            DerivedRuleWhatdo::AsNewBranches => assert!(false),
+            ApplyRuleWhatdo::AddToExistingBranches => {}
+            ApplyRuleWhatdo::AsNewBranches => assert!(false),
         }
     }
 
@@ -1473,20 +1596,22 @@ mod tests {
             SimpleStatementLetter('A', Subscript(None)),
         )]);
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::Conditional,
-            &Statement::LogicalConditional(
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'B',
-                    Subscript(None),
-                ))),
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'A',
-                    Subscript(None),
-                ))),
-            ),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::Conditional,
+                &Statement::LogicalConditional(
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'B',
+                        Subscript(None),
+                    ))),
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'A',
+                        Subscript(None),
+                    ))),
+                ),
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 2);
         assert_eq!(
@@ -1501,8 +1626,8 @@ mod tests {
             &Statement::Simple(SimpleStatementLetter('A', Subscript(None)))
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => assert!(false),
-            DerivedRuleWhatdo::AsNewBranches => {}
+            ApplyRuleWhatdo::AddToExistingBranches => assert!(false),
+            ApplyRuleWhatdo::AsNewBranches => {}
         }
     }
 
@@ -1512,20 +1637,22 @@ mod tests {
             SimpleStatementLetter('A', Subscript(None)),
         )]);
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::NegationOfConjunction,
-            &Statement::LogicalNegation(Box::new(Statement::LogicalConjunction(
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'B',
-                    Subscript(None),
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::NegationOfConjunction,
+                &Statement::LogicalNegation(Box::new(Statement::LogicalConjunction(
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'B',
+                        Subscript(None),
+                    ))),
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'A',
+                        Subscript(None),
+                    ))),
                 ))),
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'A',
-                    Subscript(None),
-                ))),
-            ))),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 2);
         assert_eq!(
@@ -1543,8 +1670,8 @@ mod tests {
             ))))
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => assert!(false),
-            DerivedRuleWhatdo::AsNewBranches => {}
+            ApplyRuleWhatdo::AddToExistingBranches => assert!(false),
+            ApplyRuleWhatdo::AsNewBranches => {}
         }
     }
 
@@ -1554,20 +1681,22 @@ mod tests {
             SimpleStatementLetter('A', Subscript(None)),
         )]);
 
-        let rule_derive_result = truth_tree_method.apply_rule(
-            Rule::Disjunction,
-            &Statement::LogicalDisjunction(
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'B',
-                    Subscript(None),
-                ))),
-                Box::new(Statement::Simple(SimpleStatementLetter(
-                    'A',
-                    Subscript(None),
-                ))),
-            ),
-            &truth_tree_method.tree.main_trunk_id(),
-        );
+        let rule_derive_result = truth_tree_method
+            .apply_rule(
+                Rule::Disjunction,
+                &Statement::LogicalDisjunction(
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'B',
+                        Subscript(None),
+                    ))),
+                    Box::new(Statement::Simple(SimpleStatementLetter(
+                        'A',
+                        Subscript(None),
+                    ))),
+                ),
+                &truth_tree_method.tree.main_trunk_id(),
+            )
+            .unwrap();
 
         assert_eq!(rule_derive_result.statements.len(), 2);
         assert_eq!(
@@ -1579,8 +1708,8 @@ mod tests {
             &Statement::Simple(SimpleStatementLetter('A', Subscript(None)))
         );
         match rule_derive_result.whatdo {
-            DerivedRuleWhatdo::AddToExistingBranches => assert!(false),
-            DerivedRuleWhatdo::AsNewBranches => {}
+            ApplyRuleWhatdo::AddToExistingBranches => assert!(false),
+            ApplyRuleWhatdo::AsNewBranches => {}
         }
     }
 
@@ -1635,7 +1764,7 @@ mod tests {
     fn instantiate_quantified_statement() {
         // Quantified statement: ∀x((A¹x & B¹x) ⊃ ∀y((~C¹y) ⊃ ∃z(A²zy & B²zx)))
         // After instantiation:     (A¹a & B¹a) ⊃ ∀y((~C¹y) ⊃ ∃z(A²zy & B²za))
-        let statement = Statement::Universal(
+        /*let statement = Statement::Universal(
             Variable('x', Subscript(None)),
             Box::new(Formula::Conditional(
                 Box::new(Formula::Conjunction(
@@ -1685,6 +1814,124 @@ mod tests {
             "{:#?}",
             truth_tree
                 .instantiate_quantified_statement(&statement, &SingularTerm('a', Subscript(None)))
+        );*/
+    }
+
+    #[test]
+    fn instantiates_uq_one_singular_term_at_a_time() {
+        let truth_tree_method = TruthTreeMethod::new(&vec![Statement::Universal(
+            Variable('x', Subscript(None)),
+            Box::new(Formula::Negation(Box::new(Formula::Negation(Box::new(
+                Formula::Statement(Box::new(Statement::Existential(
+                    Variable('y', Subscript(None)),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('A', Subscript(None), Degree(3)),
+                        vec![
+                            Term::Variable(Variable('x', Subscript(None))),
+                            Term::SingularTerm(SingularTerm('a', Subscript(None))),
+                            Term::SingularTerm(SingularTerm('b', Subscript(None))),
+                        ],
+                    )),
+                ))),
+            ))))),
+        )]);
+
+        // Should go UQ (term 'a') -> Double Negation -> Existential -> Singular -> repeat once (term 'b')
+        // Relies on priority order for the order in which statements appear in tree
+        let truth_tree = truth_tree_method.compute();
+
+        let mut statements_iter = truth_tree
+            .branch_from_id(&truth_tree.main_trunk_id())
+            .statements();
+
+        statements_iter.next(); // Skip initial statement of tree
+
+        assert_eq!(
+            statements_iter.next().unwrap().1.statement,
+            Statement::LogicalNegation(Box::new(Statement::LogicalNegation(Box::new(
+                Statement::Existential(
+                    Variable('y', Subscript(None)),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('A', Subscript(None), Degree(3)),
+                        vec![
+                            Term::SingularTerm(SingularTerm('a', Subscript(None))),
+                            Term::SingularTerm(SingularTerm('a', Subscript(None))),
+                            Term::SingularTerm(SingularTerm('b', Subscript(None)))
+                        ]
+                    ))
+                )
+            ))))
+        );
+
+        assert_eq!(
+            statements_iter.next().unwrap().1.statement,
+            Statement::Existential(
+                Variable('y', Subscript(None)),
+                Box::new(Formula::Predicate(
+                    PredicateLetter('A', Subscript(None), Degree(3)),
+                    vec![
+                        Term::SingularTerm(SingularTerm('a', Subscript(None))),
+                        Term::SingularTerm(SingularTerm('a', Subscript(None))),
+                        Term::SingularTerm(SingularTerm('b', Subscript(None))),
+                    ]
+                ))
+            )
+        );
+
+        assert_eq!(
+            statements_iter.next().unwrap().1.statement,
+            Statement::Singular(
+                PredicateLetter('A', Subscript(None), Degree(3)),
+                vec![
+                    SingularTerm('a', Subscript(None)),
+                    SingularTerm('a', Subscript(None)),
+                    SingularTerm('b', Subscript(None))
+                ]
+            )
+        );
+
+        assert_eq!(
+            statements_iter.next().unwrap().1.statement,
+            Statement::LogicalNegation(Box::new(Statement::LogicalNegation(Box::new(
+                Statement::Existential(
+                    Variable('y', Subscript(None)),
+                    Box::new(Formula::Predicate(
+                        PredicateLetter('A', Subscript(None), Degree(3)),
+                        vec![
+                            Term::SingularTerm(SingularTerm('b', Subscript(None))),
+                            Term::SingularTerm(SingularTerm('a', Subscript(None))),
+                            Term::SingularTerm(SingularTerm('b', Subscript(None)))
+                        ]
+                    ))
+                )
+            ))))
+        );
+
+        assert_eq!(
+            statements_iter.next().unwrap().1.statement,
+            Statement::Existential(
+                Variable('y', Subscript(None)),
+                Box::new(Formula::Predicate(
+                    PredicateLetter('A', Subscript(None), Degree(3)),
+                    vec![
+                        Term::SingularTerm(SingularTerm('b', Subscript(None))),
+                        Term::SingularTerm(SingularTerm('a', Subscript(None))),
+                        Term::SingularTerm(SingularTerm('b', Subscript(None))),
+                    ]
+                ))
+            )
+        );
+
+        assert_eq!(
+            statements_iter.next().unwrap().1.statement,
+            Statement::Singular(
+                PredicateLetter('A', Subscript(None), Degree(3)),
+                vec![
+                    SingularTerm('b', Subscript(None)),
+                    SingularTerm('a', Subscript(None)),
+                    SingularTerm('b', Subscript(None))
+                ]
+            )
         );
     }
 }

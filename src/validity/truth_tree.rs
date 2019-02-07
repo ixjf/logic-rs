@@ -21,7 +21,7 @@ pub struct BranchNode {
 
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
-pub struct Id(NodeId);
+pub struct Id(NodeId); // Id is guaranteed to be unique to this process, and so can't clash with any branch ID either
 
 pub struct Branch {
     children: Tree<BranchNode>,
