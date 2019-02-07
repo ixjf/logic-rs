@@ -358,10 +358,7 @@ impl Serialize for TruthTree {
                         derived_from.serialize_field("rule", &rule)?;
                         derived_from.end()
                     }
-                    None => {
-                        let derived_from = serializer.serialize_struct("DerivedFrom", 0)?;
-                        derived_from.end()
-                    }
+                    None => serializer.serialize_none(),
                 }
             }
         }
