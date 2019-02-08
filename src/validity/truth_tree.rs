@@ -2,6 +2,7 @@ use super::algorithm::Rule;
 use crate::parser::Statement;
 use id_tree::InsertBehavior::*;
 use id_tree::*;
+use snowflake::ProcessUniqueId;
 use std::iter::{once, Chain, Once};
 
 #[cfg(feature = "serde_support")]
@@ -16,7 +17,19 @@ pub struct BranchNodeLocation {
 #[derive(Clone, Debug)]
 pub struct BranchNode {
     pub statement: Statement,
-    pub derived_from: Option<(BranchNodeLocation, Rule)>,
+    pub derived_from: Option<(BranchNodeLocation, Rule, DerivationId)>,
+}
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde_support", derive(Serialize))]
+pub struct DerivationId {
+    pub(super) id: ProcessUniqueId, // Identifies a node that comes from the same derivation as another with the same ID
+                                    // Note that this doesn't mean a node that is derived from the same statement, but rather that it is part of the same
+                                    // vector of resulting statements from the application of ONE rule at ONE point in time
+                                    // So e.g. deriving UQ twice leads to two statements that were derived from the same statement,
+                                    // but they don't have the same derivation ID because they come from two different applications of a rule
+                                    // On the other hand, deriving with the conditional rule leads to two statements, derived from the same statement,
+                                    // and ALSO from the same application of the rule
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
@@ -343,7 +356,7 @@ impl Serialize for TruthTree {
             }
         }
 
-        struct DerivedFromSer<'a>(&'a Option<(BranchNodeLocation, Rule)>);
+        struct DerivedFromSer<'a>(&'a Option<(BranchNodeLocation, Rule, DerivationId)>);
 
         impl<'a> Serialize for DerivedFromSer<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -351,11 +364,12 @@ impl Serialize for TruthTree {
                 S: Serializer,
             {
                 match self.0 {
-                    Some((node_loc, rule)) => {
+                    Some((node_loc, rule, derivation_id)) => {
                         let mut derived_from = serializer.serialize_struct("DerivedFrom", 3)?;
                         derived_from.serialize_field("node_id", &node_loc.node_id)?;
                         derived_from.serialize_field("branch_id", &node_loc.branch_id)?;
                         derived_from.serialize_field("rule", &rule)?;
+                        derived_from.serialize_field("derivation_id", &derivation_id)?;
                         derived_from.end()
                     }
                     None => serializer.serialize_none(),

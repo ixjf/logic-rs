@@ -1,5 +1,6 @@
 use super::truth_tree::*;
 use crate::parser::{Formula, SingularTerm, Statement, Subscript, Term, Variable};
+use snowflake::ProcessUniqueId;
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::iter::once;
@@ -176,6 +177,12 @@ impl TruthTreeMethod {
                         })
                         .collect::<Vec<_>>();
 
+                    // Generate a unique ID for all resulting statements
+                    // (to identify them as resulting from the same application of a rule)
+                    let derivation_id = DerivationId {
+                        id: ProcessUniqueId::new(),
+                    };
+
                     // Apply the rule to every open branch
                     for child_branch_id in open_branches_ids {
                         match self.apply_rule(rule.clone(), &statement, &child_branch_id) {
@@ -197,6 +204,7 @@ impl TruthTreeMethod {
                                                                 branch_id: branch_id.clone(),
                                                             },
                                                             rule.clone(),
+                                                            derivation_id.clone(),
                                                         )),
                                                     });
 
@@ -214,6 +222,7 @@ impl TruthTreeMethod {
                                                             branch_id: branch_id.clone(),
                                                         },
                                                         rule.clone(),
+                                                        derivation_id.clone(),
                                                     )),
                                                 }]);
 

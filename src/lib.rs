@@ -8,6 +8,8 @@ extern crate id_tree;
 #[macro_use]
 extern crate serde;
 
+extern crate snowflake;
+
 mod parser;
 mod validity;
 
