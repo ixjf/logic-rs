@@ -151,7 +151,7 @@ impl TruthTreeMethod {
 
         // All nodes on the queue are already on the tree
         // A node represents some statement that needs to have a rule applied to it
-        while let Some(QueueNode {
+        'outer: while let Some(QueueNode {
             statement_id,
             statement,
             rule,
@@ -166,19 +166,19 @@ impl TruthTreeMethod {
 
             match rule {
                 Some((rule, repeat)) => {
-                    match self.apply_rule(rule.clone(), &statement, &branch_id) {
-                        Some(result) => {
-                            // Open child branches of branch where original statement is
-                            let open_branches_ids = self
-                                .tree
-                                .traverse_downwards_branch_ids(&branch_id)
-                                .filter(|x| {
-                                    !self.tree.branch_from_id(&x).is_closed()
-                                        && self.tree.branch_is_last_child(&x)
-                                })
-                                .collect::<Vec<_>>();
+                    // Open child branches of branch where original statement is
+                    let open_branches_ids = self
+                        .tree
+                        .traverse_downwards_branch_ids(&branch_id)
+                        .filter(|x| {
+                            !self.tree.branch_from_id(&x).is_closed()
+                                && self.tree.branch_is_last_child(&x)
+                        })
+                        .collect::<Vec<_>>();
 
-                            for child_branch_id in open_branches_ids {
+                    for child_branch_id in open_branches_ids {
+                        match self.apply_rule(rule.clone(), &statement, &child_branch_id) {
+                            Some(result) => {
                                 for x in &result.statements {
                                     let (derived_statement_id, derived_statement_branch_id) = {
                                         match result.whatdo {
@@ -238,41 +238,41 @@ impl TruthTreeMethod {
                                     };
                                     queue.push(new_node);
                                 }
+
+                                failed_last = false;
                             }
+                            None => {
+                                // Rule didn't need to be applied
 
-                            failed_last = false;
-                        }
-                        None => {
-                            // Rule didn't need to be applied
+                                if repeat {
+                                    // Some rules can be reapplied over and over (i.e. UQ)
+                                    // If this is the case, we readd this node to the queue
 
-                            if repeat {
-                                // Some rules can be reapplied over and over (i.e. UQ)
-                                // If this is the case, we readd this node to the queue
+                                    // However, if we don't do anything else, we will run into an infinite
+                                    // loop when the tree doesn't close.
 
-                                // However, if we don't do anything else, we will run into an infinite
-                                // loop when the tree doesn't close.
+                                    // Check if we haven't tried every other rule and some didn't fail
+                                    // If they all failed, we might as well stop now
+                                    if !queue.iter().any(|x| !x.failed_last) {
+                                        break 'outer;
+                                    }
 
-                                // Check if we haven't tried every other rule and some didn't fail
-                                // If they all failed, we might as well stop now
-                                if !queue.iter().any(|x| !x.failed_last) {
-                                    break;
+                                    // FIXME This doesn't solve infinitely recursive trees
+                                    // where you're stuck in a cycle of EQ -> UQ -> EQ
                                 }
 
-                                // FIXME This doesn't solve infinitely recursive trees
-                                // where you're stuck in a cycle of EQ -> UQ -> EQ
+                                // Since we've reached here, there are other rules that may yet be applied
+                                // What happens now is the algorithm iterates over the queue, and if no
+                                // other rule can be applied, the code above will break the loop and finish
+                                // For now, let us tell the algorithm at least this rule failed
+
+                                // Important: we won't run into an infinite loop where there are branching rules
+                                // to be applied but that can't because the queue pops UQ first all the time,
+                                // because the impl for the Ord trait on QueueNode makes sure that if
+                                // the rule has failed_last set, it'll always come after ALL other rules.
+                                // Since UQ is the only repeat rule, we're safe
+                                failed_last = true;
                             }
-
-                            // Since we've reached here, there are other rules that may yet be applied
-                            // What happens now is the algorithm iterates over the queue, and if no
-                            // other rule can be applied, the code above will break the loop and finish
-                            // For now, let us tell the algorithm at least this rule failed
-
-                            // Important: we won't run into an infinite loop where there are branching rules
-                            // to be applied but that can't because the queue pops UQ first all the time,
-                            // because the impl for the Ord trait on QueueNode makes sure that if
-                            // the rule has failed_last set, it'll always come after ALL other rules.
-                            // Since UQ is the only repeat rule, we're safe
-                            failed_last = true;
                         }
                     }
 

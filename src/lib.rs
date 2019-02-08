@@ -275,4 +275,17 @@ mod tests {
 
         assert_eq!(single_statement.is_contingency().0, false);
     }
+
+    /*#[test]
+    fn rip() {
+        match super::parse_input("∀x(G²xx ∨ ∃y(F²xy)), ~∃zG²zz ∴ ∃x∃yF²xy") {
+            Ok(input_kind) => match input_kind {
+                InputKind::Argument(arg) => {
+                    let (_, truth_tree) = arg.is_valid();
+                }
+                _ => {}
+            },
+            Err(_) => assert!(false),
+        }
+    }*/
 }
