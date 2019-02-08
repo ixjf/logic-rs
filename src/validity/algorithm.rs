@@ -19,7 +19,7 @@ pub enum Rule {
     Disjunction,
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 struct QueueNode {
     statement_id: Id,
     statement: Statement,
@@ -176,6 +176,7 @@ impl TruthTreeMethod {
                         })
                         .collect::<Vec<_>>();
 
+                    // Apply the rule to every open branch
                     for child_branch_id in open_branches_ids {
                         match self.apply_rule(rule.clone(), &statement, &child_branch_id) {
                             Some(result) => {
@@ -240,6 +241,30 @@ impl TruthTreeMethod {
                                 }
 
                                 failed_last = false;
+
+                                // A new node was added to the tree
+                                // This invalidates the failed_last state, since we don't know if rules on the queue
+                                // might apply to any potential new singular terms
+                                // If we didn't invalidate the failed_last state, we could have a situation where:
+                                // tried all uq rules, failed
+                                // failed_last = true on all uq rules
+                                // some other rule then succeeded
+                                // rule pushed off the queue
+                                // compute() iterates over remaining uq rules, one of them doesn't apply
+                                // and since failed_last = true, it fails, even though there are other rules
+                                // to try
+                                queue = BinaryHeap::from(
+                                    queue
+                                        .into_vec()
+                                        .iter()
+                                        .map(|x| QueueNode {
+                                            failed_last: false,
+                                            ..x.clone()
+                                        })
+                                        .collect::<Vec<_>>(),
+                                );
+                                // FIXME Is there a more efficient way (if we're thinking about that)
+                                // to do this other than using RefCell?
                             }
                             None => {
                                 // Rule didn't need to be applied
