@@ -24,12 +24,16 @@ pub struct BranchNode {
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct DerivationId {
     pub(super) id: ProcessUniqueId, // Identifies a node that comes from the same derivation as another with the same ID
-                                    // Note that this doesn't mean a node that is derived from the same statement, but rather that it is part of the same
-                                    // vector of resulting statements from the application of ONE rule at ONE point in time
-                                    // So e.g. deriving UQ twice leads to two statements that were derived from the same statement,
-                                    // but they don't have the same derivation ID because they come from two different applications of a rule
-                                    // On the other hand, deriving with the conditional rule leads to two statements, derived from the same statement,
-                                    // and ALSO from the same application of the rule
+    // Note that this doesn't mean a node that is derived from the same statement, but rather that it is part of the same
+    // vector of resulting statements from the application of ONE rule at ONE point in time
+    // So e.g. deriving UQ twice leads to two statements that were derived from the same statement,
+    // but they don't have the same derivation ID because they come from two different applications of a rule
+    // On the other hand, deriving with the conditional rule leads to two statements, derived from the same statement,
+    // and ALSO from the same application of the rule,
+    pub index: u64, // Unique ID for identifying statements on the same 'line'
+                    // e.g. if a statement results in two statements, each one of which starts a new branch (say, A IMPLIES B), then
+                    // their index is the same. If, on the other hand, the statement results in two statements added to the same branch
+                    // (say, A AND B), then each have a different index.
 }
 
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]

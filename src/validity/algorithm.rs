@@ -168,6 +168,8 @@ impl TruthTreeMethod {
             match rule {
                 Some((rule, repeat)) => {
                     // Open child branches of branch where original statement is
+                    // This reflects the open branches BEFORE we added the results
+                    // of the application of rules. It MUST be like this.
                     let open_branches_ids = self
                         .tree
                         .traverse_downwards_branch_ids(&branch_id)
@@ -179,8 +181,9 @@ impl TruthTreeMethod {
 
                     // Generate a unique ID for all resulting statements
                     // (to identify them as resulting from the same application of a rule)
-                    let derivation_id = DerivationId {
+                    let mut derivation_id = DerivationId {
                         id: ProcessUniqueId::new(),
+                        index: 0u64,
                     };
 
                     // Apply the rule to every open branch
@@ -207,6 +210,9 @@ impl TruthTreeMethod {
                                                             derivation_id.clone(),
                                                         )),
                                                     });
+
+                                                // Each derived statement added to the same branch has a unique 'index'
+                                                derivation_id.index += 1;
 
                                                 (new_statement_id, child_branch_id.clone())
                                             }
