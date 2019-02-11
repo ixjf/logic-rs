@@ -1,4 +1,4 @@
-import { tokens } from './tokens.js';
+import { tokens } from './tokens';
 
 export var keysMap = {
     // Key must match codemirror's syntax for keys

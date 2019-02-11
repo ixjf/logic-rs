@@ -1,4 +1,8 @@
 export var tokens = {
+    grouperOpening: '(',
+    grouperClosing: ')',
+    statementSetOpening: '{',
+    statementSetClosing: '}',
     conclusionIndicator: String.fromCharCode(0x2234),
     subscriptNumber1: String.fromCharCode(0x2081),
     subscriptNumber2: String.fromCharCode(0x2082),
@@ -22,6 +26,9 @@ export var tokens = {
     superscriptNumber0: String.fromCharCode(0x2070),
     disjunction: String.fromCharCode(0x2228),
     conditional: String.fromCharCode(0x2283),
+    conjunction: '&',
+    negation: '~',
     existentialQuantifier: String.fromCharCode(0x2203),
     universalQuantifier: String.fromCharCode(0x2200),
-}
+    statementSeparator: ','
+};

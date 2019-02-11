@@ -1,0 +1,43 @@
+.cm-grouper {
+    color: rgb(78, 78, 78);
+}
+
+.cm-statement-set {
+    color: rgb(0, 140, 255);
+}
+
+.cm-statement-separator {
+    color: rgb(177, 158, 231);
+}
+
+.cm-conclusion-indicator {
+    color: rgb(158, 199, 223);
+}
+
+.cm-identifier {
+    color: rgb(107, 74, 252);
+}
+
+.cm-identifier-sub {
+    color: rgb(107, 74, 252);
+}
+
+.cm-connective {
+    color: rgb(212, 122, 19);
+}
+
+.cm-singular-term {
+    color: rgb(80, 201, 248);
+}
+
+.cm-degree {
+    color: rgb(144, 120, 252);
+}
+
+.cm-quantifier {
+    color: rgb(212, 122, 19);
+}
+
+.cm-variable {
+    color: rgb(80, 201, 248);
+}

@@ -1,6 +1,7 @@
 {
   "name": "www",
   "version": "0.1.0",
+  "description": "",
   "main": "index.js",
   "scripts": {
     "build": "webpack --config webpack.config.js",
@@ -12,6 +13,8 @@
     "rust",
     "webpack"
   ],
+  "author": "Pedro Fanha <ixjf@outlook.com>",
+  "license": "MIT",
   "devDependencies": {
     "webpack": "^4.16.3",
     "webpack-cli": "^3.1.0",
@@ -23,8 +26,11 @@
     "bootstrap": "^4.2.1",
     "codemirror": "^5.43.0",
     "css-loader": "^2.1.0",
+    "file-loader": "^3.0.1",
+    "ionicons": "^4.5.5",
     "jquery": "^3.3.1",
     "popper.js": "^1.14.7",
-    "style-loader": "^0.23.1"
+    "style-loader": "^0.23.1",
+    "vis": "^4.21.0"
   }
 }

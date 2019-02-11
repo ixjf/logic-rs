@@ -2,10 +2,10 @@ import CodeMirror from 'codemirror/lib/codemirror.js';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/theme/duotone-dark.css';
 import 'codemirror/addon/mode/simple.js';
-import './editor.mode.js';
-import './editor.mode.css';
-import { mapObject } from './utils.js';
-import { keysMap } from './keysmap.js';
+import './editor.mode';
+import './css/editor.mode.css';
+import { mapObject } from './obj_utils';
+import { keysMap } from './keysmap';
 
 export var inputEditor = CodeMirror.fromTextArea(document.getElementById("input-textarea"), {
     mode: "rpl",

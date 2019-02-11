@@ -41,12 +41,13 @@
         <div class="card">
           <div class="card-header" id="lexer-grammar-header">
             <h2 class="mb-0">
-              <button class="btn btn-link collapsed" type="button" data-toggle="collapse" data-target="#lexer-grammar-contents"
-                aria-expanded="false" aria-controls="lexer-grammar-contents">Lexer Grammar</button>
+              <button class="btn btn-link collapsed" type="button" data-toggle="collapse"
+                data-target="#lexer-grammar-contents" aria-expanded="false" aria-controls="lexer-grammar-contents">Lexer
+                Grammar</button>
             </h2>
           </div>
-          <!-- 3) add before text editor what kind of input is allowed -->
-          <div id="lexer-grammar-contents" class="collapse" data-parent="#lexer-grammar-accordion" aria-labelledby="lexer-grammar-header">
+          <div id="lexer-grammar-contents" class="collapse" data-parent="#lexer-grammar-accordion"
+            aria-labelledby="lexer-grammar-header">
             <div class="card-body">
               <table class="table">
                 <thead>
@@ -233,12 +234,15 @@
         <h4 class="alert-heading" id="alert-heading"></h4>
         <pre><a id="alert-message"></a></pre>
       </div>
+
+      <div id="truth-tree" class="truth-tree"></div>
     </form>
   </div>
+
   <script type="module">
     import { tokens } from './tokens.js';
     import { keysMap } from './keysmap.js';
-    import { swapKeyValueObject } from './utils.js';
+    import { swapObjectKeyValue } from './obj_utils.js';
 
     window.onload = function () {
       var tokenMappings = {
@@ -270,12 +274,12 @@
       };
 
       for (var className in tokenMappings) {
-        document.querySelectorAll(className).forEach(function (e, _1, _2) {
+        document.querySelectorAll(className).forEach(e => {
           e.innerHTML = tokenMappings[className];
         });
       }
 
-      var swappedKeysMap = swapKeyValueObject(keysMap);
+      var swappedKeysMap = swapObjectKeyValue(keysMap);
 
       var keyShortcutMappings = {
         '.conclusion-indicator-shortcut': swappedKeysMap[tokens.conclusionIndicator],
@@ -306,7 +310,7 @@
       };
 
       for (var className in keyShortcutMappings) {
-        document.querySelectorAll(className).forEach(function (e) {
+        document.querySelectorAll(className).forEach(e => {
           e.setAttribute("title", keyShortcutMappings[className]);
         })
       }
