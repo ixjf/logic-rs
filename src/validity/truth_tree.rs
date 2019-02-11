@@ -106,6 +106,8 @@ impl Branch {
     }
 }
 
+// TODO: Can't StatementsIter be made more general, then have both this and IdsIter derive
+// from that same iterator?
 #[derive(Clone)]
 pub struct StatementsIter<'a> {
     tree: &'a Tree<BranchNode>,

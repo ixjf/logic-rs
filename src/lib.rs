@@ -278,9 +278,13 @@ mod tests {
         assert_eq!(single_statement.is_contingency().0, false);
     }
 
-    /*#[test]
+    #[test]
     fn rip() {
-        match super::parse_input("∀x(G²xx ∨ ∃y(F²xy)), ~∃zG²zz ∴ ∃x∃yF²xy") {
+        match super::parse_input(
+            "(∀x)(B¹x ⊃ (∀y)(T¹y ⊃ O²xy)),\
+             (B¹j & ~O²jm)\
+             ∴ ~T¹m",
+        ) {
             Ok(input_kind) => match input_kind {
                 InputKind::Argument(arg) => {
                     let (_, truth_tree) = arg.is_valid();
@@ -289,5 +293,5 @@ mod tests {
             },
             Err(_) => assert!(false),
         }
-    }*/
+    }
 }

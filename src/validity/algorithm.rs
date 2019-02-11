@@ -68,9 +68,16 @@ impl Ord for QueueNode {
         // Whichever failed the last time shall come last as well
         // (see end of 'compute' method for details)
         match (self.failed_last, other.failed_last) {
-            (true, false) => return Ordering::Less,
-            (false, true) => return Ordering::Greater,
-            (true, true) => return Ordering::Greater,
+            (true, false) => {
+                return Ordering::Less;
+            }
+            (false, true) => {
+                return Ordering::Greater;
+            }
+            (true, true) => {
+                return Ordering::Equal;
+            }
+            // ^ If both failed last, follow insertion order (FIFO)
             (false, false) => {}
         }
 
@@ -160,16 +167,17 @@ impl TruthTreeMethod {
             mut failed_last,
         }) = queue.pop()
         {
-            if !self.tree.is_open() {
+            // FIXME: This probably is pointless now
+            /*if !self.tree.is_open() {
                 // There are no open branches in the entire tree, stop
                 break;
-            }
+            }*/
 
             match rule {
                 Some((rule, repeat)) => {
                     // Open child branches of branch where original statement is
                     // This reflects the open branches BEFORE we added the results
-                    // of the application of rules. It MUST be like this.
+                    // of the application of rules.
                     let open_branches_ids = self
                         .tree
                         .traverse_downwards_branch_ids(&branch_id)
@@ -178,6 +186,10 @@ impl TruthTreeMethod {
                                 && self.tree.branch_is_last_child(&x)
                         })
                         .collect::<Vec<_>>();
+
+                    if open_branches_ids.len() == 0 {
+                        continue;
+                    }
 
                     // Generate a unique ID for all resulting statements
                     // (to identify them as resulting from the same application of a rule)
@@ -219,7 +231,7 @@ impl TruthTreeMethod {
 
                                             ApplyRuleWhatdo::AsNewBranches => {
                                                 // Each derived statement will create a new child branch on every open
-                                                // branch of branch_id that is at the end of the tree
+                                                // branch under branch_id that is at the end of the tree
                                                 let new_branch = Branch::new(vec![BranchNode {
                                                     statement: x.clone(),
                                                     derived_from: Some((
@@ -279,11 +291,11 @@ impl TruthTreeMethod {
                                         .collect::<Vec<_>>(),
                                 );
                                 // FIXME Is there a more efficient way (if we're thinking about that)
-                                // to do this other than using RefCell?
+                                // to do this other than using RefCell (mutating the contents of
+                                // the queue)?
                             }
                             None => {
                                 // Rule didn't need to be applied
-
                                 if repeat {
                                     // Some rules can be reapplied over and over (i.e. UQ)
                                     // If this is the case, we readd this node to the queue
