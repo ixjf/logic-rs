@@ -154,7 +154,7 @@ impl ParsedInput {
 #[wasm_bindgen]
 pub fn parse_input(input: &str) -> Result<ParsedInput, JsValue> {
     // Have the panic hook initialize once in the lifetime of this wasm
-    // Gives us pretty errors on the browser console rather than just "Unreachable executed"
+    // Gives us pretty errors on the browser console rather than just e.g. "Unreachable executed"
     console_error_panic_hook::set_once();
 
     match logic::parse_input(input) {
