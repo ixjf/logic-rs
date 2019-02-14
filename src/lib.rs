@@ -281,9 +281,9 @@ mod tests {
     #[test]
     fn rip() {
         match super::parse_input(
-            "(∀x)(B¹x ⊃ (∀y)(T¹y ⊃ O²xy)),\
-             (B¹j & ~O²jm)\
-             ∴ ~T¹m",
+            "(∀x)(L¹x ⊃ (∃y)(F¹y & (∃z)(T¹z & P³xyz))),\
+             (∃x)(L¹x)\
+             ∴ (∃x)(F¹x & (∃y)(T¹y & (∃z)(L¹z & P³zxy)))",
         ) {
             Ok(input_kind) => match input_kind {
                 InputKind::Argument(arg) => {
