@@ -1,19 +1,12 @@
 import { mapFindByObjectIndex, objectCompareByValue } from './helpers.js';
-import statementIntoText from './stringify_statement';
-import ruleNameToLabel from './stringify_rule';
-import { DataSet, Network } from 'vis/index-network';
+import statementIntoText from './stringify_statement.js';
+import ruleNameToLabel from './stringify_rule.js';
+import { DataSet, Network } from 'vis/dist/vis-network.min.js';
 import './truth_tree.css';
 
-// TODO: To "move" the edges' origin points to under the text (rather than its center):
-// Create an intermediary node with no text, add a hidden edge from the original node
-// to this intermediary, and then make an edge from this one to the one the original
-// one pointed to
-// I wish there was simply a way to control an edge's origin point :(
-// The solution above either requires me to modify _computeLevels to take into account
-// those hidden edges, or _offsetLevels for every child branch. The first is messy,
-// and the second unnecessarily slow.
-
 export default class TruthTree {
+  // nodes in 'data' are guaranteed to be in the order that they should appear and were derived,
+  // and that is an implicit assumption behind all this code
   constructor(container, data) {
     this.network = null;
 
@@ -292,6 +285,16 @@ export default class TruthTree {
     return this.idCounter;
   }
 
+  _insertHiddenNodeOnDataSet(dataSet, level) {
+    this.idCounter += 1;
+    dataSet.nodes.push({
+      id: this.idCounter,
+      level,
+      shape: 'text',
+    });
+    return this.idCounter;
+  }
+
   _insertBranchClosedNodeOnDataSet(dataSet, level) {
     this.idCounter += 1;
     dataSet.nodes.push({
@@ -303,7 +306,7 @@ export default class TruthTree {
         code: this.css['branch-close-icon-code'],
         size: this.css['branch-close-icon-size'],
         color: this.css['branch-close-icon-colour']
-      }
+      },
     });
     return this.idCounter;
   }
@@ -320,11 +323,13 @@ export default class TruthTree {
     dataSet.edges.push({
       from,
       to,
-      color: { color: this.css['edge-colour'] }
+      color: { color: this.css['edge-colour'] },
     });
   }
 
   _populateDataSet(dataSet, branch) {
+    // Add all nodes from 'branch' into the dataset, linked by
+    // a hidden edge
     var last = branch.nodes.reduce((prev, node) => {
       node.treeId = this._insertStatementNodeOnDataSet(dataSet, node.text, node.treeLevel, node);
 
@@ -336,13 +341,29 @@ export default class TruthTree {
     }, null);
 
     if (branch.closed) {
+      // Mark as closed and stop
       var closedIconNodeId = this._insertBranchClosedNodeOnDataSet(dataSet, last.treeLevel + 1);
       this._insertHiddenEdgeOnDataSet(dataSet, last.treeId, closedIconNodeId);
     }
     else {
+      // Here we add 1 + n hidden nodes: a parent, and n children
+      // These hidden nodes serve the purpose of adding padding
+      // between the branches, because vis.js by default connects
+      // edges to the very center of the nodes
+      // We also need to offset the children branches' nodes' levels by 2
+      // (one level for the hidden parent node, one level for all the hidden children nodes)
+      var hiddenParentId = this._insertHiddenNodeOnDataSet(dataSet, last.treeLevel + 1);
+      this._insertHiddenEdgeOnDataSet(dataSet, last.treeId, hiddenParentId);
+
       branch.children.forEach(child => {
+        this._offsetLevels(child, child.nodes[0].treeLevel, 2);
+
+        var hiddenChildId = this._insertHiddenNodeOnDataSet(dataSet, last.treeLevel + 2);
+        this._insertEdgeOnDataSet(dataSet, hiddenParentId, hiddenChildId);
+
         this._populateDataSet(dataSet, child);
-        this._insertEdgeOnDataSet(dataSet, last.treeId, child.nodes[0].treeId);
+
+        this._insertHiddenEdgeOnDataSet(dataSet, hiddenChildId, child.nodes[0].treeId);
       });
     }
   }
