@@ -145,15 +145,13 @@
               <textarea id="editor"></textarea>
               <div id="error-container"></div>
             </div>
-            <div class="ui top attached tab segment" data-tab="output-tab" id="output-tab">
-              <div class="ui sizer vertical segment center aligned">
-                <div class="ui huge header">There's nothing to see here yet! :(</div>
-              </div>
+            <div class="ui top attached tab segment" data-tab="output-tab" id="output-tab-container">
               <!-- editor_output.js replaces output here -->
             </div>
             <div class="ui bottom attached tabular menu">
               <div class="item active" data-tab="input-tab">Input</div>
-              <div class="item" data-tab="output-tab">Output</div>
+              <div class="item disabled" id="output-tab">Output</div>
+              <!-- has data-tab="output-tab" but is disabled by default -->
             </div>
           </div>
         </div>

@@ -17,7 +17,7 @@ export function solve(input) {
     if (parsedInput.get_kind() == logic_wasm.InputKind.StatementSet) {
         var isConsistent = parsedInput.is_consistent();
 
-        document.getElementById('output-tab').innerHTML = _computeHtmlOutput({
+        document.getElementById('output-tab-container').innerHTML = _computeHtmlOutput({
             message: `Statement set is${isConsistent.is_consistent ? ' ' : ' not '}consistent.`,
             trees: [
                 {
@@ -34,7 +34,7 @@ export function solve(input) {
     else if (parsedInput.get_kind() == logic_wasm.InputKind.Argument) {
         var isValid = parsedInput.is_valid();
 
-        document.getElementById('output-tab').innerHTML = _computeHtmlOutput({
+        document.getElementById('output-tab-container').innerHTML = _computeHtmlOutput({
             message: `Argument is${isValid.is_valid ? ' ' : ' not '}valid.`,
             trees: [
                 {
@@ -64,7 +64,7 @@ export function solve(input) {
             isWhat = 'contingency';
         }
 
-        document.getElementById('output-tab').innerHTML = _computeHtmlOutput({
+        document.getElementById('output-tab-container').innerHTML = _computeHtmlOutput({
             message: `Statement is ${isWhat}.`,
             trees: [
                 {
@@ -89,7 +89,7 @@ export function solve(input) {
         );
     }
 
-    _moveToTab('output-tab');
+    _moveToOutputTab();
 }
 
 function _computeHtmlParseError(e) {
@@ -147,8 +147,14 @@ function _computeHtmlOutput(output) {
     return outputTabHtml;
 }
 
-function _moveToTab(tab) {
+function _moveToOutputTab() {
     $('.tabular.menu .item').removeClass('active');
-    $.tab('change tab', tab);
-    $(`.tabular.menu .item[data-tab='${tab}']`).addClass('active');
+
+    $('.tabular.menu .item[id="output-tab"]').removeClass('disabled');
+
+    $('.tabular.menu .item[id="output-tab"]').attr('data-tab', 'output-tab');
+
+    $.tab('change tab', 'output-tab');
+
+    $(`.tabular.menu .item[data-tab='output-tab']`).addClass('active');
 }
