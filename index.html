@@ -3,319 +3,351 @@
 
 <head>
   <meta charset="utf-8">
+  <meta name="keywords"
+    content="logic, rust, parser, formulas, relational, predicate, first, order, first-order, truth-tree, consistency, formal-validity, validity, contingency, contradiction, tautology, pest, wasm">
   <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
   <title>logic-rs</title>
   <script src="./bootstrap.js"></script>
+  <link href="https://fonts.googleapis.com/css?family=Abel" rel="stylesheet">
+  <link rel="stylesheet" href="http://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
+  <script src="https://code.jquery.com/jquery-3.1.1.min.js"
+    integrity="sha256-hVVnYaiADRTO2PzUGmuLJr8BLUSjGIZsDYGmIJLv2b8=" crossorigin="anonymous"></script>
+  <link rel="stylesheet" type="text/css" href="/semantic/dist/semantic.min.css">
+  <script src="/semantic/dist/semantic.min.js"></script>
+
+  <style type="text/css">
+    .CodeMirror,
+    .CodeMirror-scroll {
+      height: 32vh;
+      max-height: 325px;
+      max-width: 1000px;
+    }
+  </style>
 </head>
 
 <body>
-  <nav class="navbar navbar-dark bg-primary">
-    <a class="navbar-brand text-white-50">logic-rs</a>
-    <ul class="nav nav-pills">
-      <li class="nav-item">
-        <a class="text-white-50 mr-2">Find source code on:</a>
-        <a class="btn btn-dark" role="button" href="https://github.com/ixjf/logic-rs/">GitHub</a>
-      </li>
-    </ul>
-  </nav>
-  <div class="container">
-    <div class="jumbotron">
-      <h1 class="display-4">Truth Tree Solver</h1>
-      <p class="lead">This page demonstrates logic-rs, a parser of relational predicate logic and
-        truth tree solver written in Rust. <br /> <br />
-        The library can:
-        <ul class="lead">
-          <li>understand statement sets, arguments, and single statements;</li>
-          <li>produce detailed truth trees to check consistency of statement sets, formal validity of arguments,
-            and properties of statements such as whether they're a contradiction, tautology, or contingency.</li>
-        </ul>
-      </p>
-      <hr class="my-4">
-      <a>The grammar used is from the book <a class="font-italic">Meaning and Argument: An Introduction To Logic
-          Through Language</a>, by Ernest Lepore and Sam Cumming. Below is described the lexer grammar, but
-        you can find a more detailed description of the language
-        <a href="https://github.com/ixjf/logic-rs/wiki/Language">here</a>.
-      </a>
-      <br /> <br />
-      <div class="accordion" id="lexer-grammar-accordion">
-        <div class="card">
-          <div class="card-header" id="lexer-grammar-header">
-            <h2 class="mb-0">
-              <button class="btn btn-link collapsed" type="button" data-toggle="collapse"
-                data-target="#lexer-grammar-contents" aria-expanded="false" aria-controls="lexer-grammar-contents">Lexer
-                Grammar</button>
-            </h2>
-          </div>
-          <div id="lexer-grammar-contents" class="collapse" data-parent="#lexer-grammar-accordion"
-            aria-labelledby="lexer-grammar-header">
-            <div class="card-body">
-              <table class="table">
-                <thead>
-                  <tr>
-                    <th scope="col" style="min-width:100px;">Tokens</th>
-                    <th scope="col">Meaning</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <th scope="row"><kbd>(</kbd> <kbd>)</kbd></th>
-                    <td>Groupers - specify precedence</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>{</kbd> <kbd>}</kbd></th>
-                    <td>Statement set</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>,</kbd></th>
-                    <td>Separates statements in a statement set/argument</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd><a class="conclusion-indicator-token"></a></kbd></th>
-                    <td>Specifies that a conclusion follows</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>A</kbd> .. <kbd>Z</kbd></th>
-                    <td>Statement/predicate letter</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>A<sub>p</sub></kbd></th>
-                    <td>Simple statement, where 'A' is any statement letter and 'p' is an optional
-                      number in Unicode subscript without leading zeros</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>&</kbd></th>
-                    <td>Specifies a conjunction of two formulas</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>~</kbd></th>
-                    <td>Specifies a negation of a formula</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd><a class="disjunction-token"></a></kbd></th>
-                    <td>Specifies a disjunction of two formulas</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd><a class="conditional-token"></a></kbd></th>
-                    <td>Specifies a conditional over two formulas</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>a</kbd> .. <kbd>w</kbd></th>
-                    <td>Singular term letter</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>a<sub>p</sub></kbd></th>
-                    <td>Singular term, where 'a' is any singular term letter, and 'p' is an optional number in
-                      Unicode subscript without leading zeros</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>A<sub>p</sub><sup>q</sup></kbd></th>
-                    <td>Simple predicate, where 'A' and 'p' are the same as for a simple statement, and 'q' is
-                      the degree of the predicate (the number of terms that follow it), in Unicode subscript,
-                      without leading zeros
-                    </td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd><a class="existential-quantifier-token"></a></kbd></th>
-                    <td>Existential quantifier</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd><a class="universal-quantifier-token"></a></kbd></th>
-                    <td>Universal quantifier</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>x</kbd> .. <kbd>z</kbd></th>
-                    <td>Variable letter</td>
-                  </tr>
-                  <tr>
-                    <th scope="row"><kbd>x<sub>p</sub></kbd></th>
-                    <td>Variable, where 'x' is any variable letter and 'p' is an optional number in Unicode
-                      subscript without leading zeros
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+  <div class="ui grid container stackable">
+    <div class="ui grid container stackable">
+      <div class="one column row">
+        <div class="column">
+          <div class="ui very padded violet segment">
+            <div class="ui grid">
+              <div class="right floated seven wide column">
+                <div class="ui huge header right aligned">
+                  logic-rs
+                  <div class="sub header">A parser of relational predicate logic and truth tree solver
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="ui top attached active tab segment" data-tab="input-tab">
+              <div class="ui icon buttons">
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="universal-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="existential-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="conjunction-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="negation-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="disjunction-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="conditional-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="conclusion-ind-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="statement-set-opening-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="statement-set-closing-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="grouper-opening-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="grouper-closing-token"></span>
+                </button>
+              </div>
+              <div class="ui icon buttons">
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="subscript-zero-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="subscript-one-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="subscript-two-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="subscript-three-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="subscript-four-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="subscript-five-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="subscript-six-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="subscript-seven-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="subscript-eight-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="subscript-nine-token"></span>
+                </button>
+              </div>
+              <div class="ui icon buttons" style="margin-bottom:8px;">
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="superscript-zero-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="superscript-one-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="superscript-two-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="superscript-three-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="superscript-four-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="superscript-five-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="superscript-six-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="superscript-seven-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="superscript-eight-token"></span>
+                </button>
+                <button class="ui button editor-toolbar-shortcut">
+                  <span class="superscript-nine-token"></span>
+                </button>
+              </div>
+              <button class="ui violet button right floated" id="solve">Solve</button>
+              <textarea id="editor"></textarea>
+              <div id="error-container"></div>
+            </div>
+            <div class="ui top attached tab segment" data-tab="output-tab" id="output-tab">
+              <div class="ui sizer vertical segment center aligned">
+                <div class="ui huge header">There's nothing to see here yet! :(</div>
+              </div>
+              <!-- editor_output.js replaces output here -->
+            </div>
+            <div class="ui bottom attached tabular menu">
+              <div class="item active" data-tab="input-tab">Input</div>
+              <div class="item" data-tab="output-tab">Output</div>
             </div>
           </div>
         </div>
       </div>
     </div>
-    <form>
-      <div class="form-group">
-        <p class="text-center">Input one statement set, argument, or single statement below:</p>
-        <div class="container">
-          <div class="btn-group flex-wrap d-flex justify-content-center" role="group" aria-label="Editor button group">
-            <button type="button" class="btn btn-primary conclusion-indicator-shortcut editor-button-group-btn">
-              <a class="conclusion-indicator-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary subscript-1-shortcut editor-button-group-btn">
-              <a class="subscript-1-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary subscript-2-shortcut editor-button-group-btn">
-              <a class="subscript-2-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary subscript-3-shortcut editor-button-group-btn">
-              <a class="subscript-3-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary subscript-4-shortcut editor-button-group-btn">
-              <a class="subscript-4-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary subscript-5-shortcut editor-button-group-btn">
-              <a class="subscript-5-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary subscript-6-shortcut editor-button-group-btn">
-              <a class="subscript-6-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary subscript-7-shortcut editor-button-group-btn">
-              <a class="subscript-7-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary subscript-8-shortcut editor-button-group-btn">
-              <a class="subscript-8-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary subscript-9-shortcut editor-button-group-btn">
-              <a class="subscript-9-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary subscript-0-shortcut editor-button-group-btn">
-              <a class="subscript-0-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary superscript-1-shortcut editor-button-group-btn">
-              <a class="superscript-1-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary superscript-2-shortcut editor-button-group-btn">
-              <a class="superscript-2-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary superscript-3-shortcut editor-button-group-btn">
-              <a class="superscript-3-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary superscript-4-shortcut editor-button-group-btn">
-              <a class="superscript-4-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary superscript-5-shortcut editor-button-group-btn">
-              <a class="superscript-5-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary superscript-6-shortcut editor-button-group-btn">
-              <a class="superscript-6-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary superscript-7-shortcut editor-button-group-btn">
-              <a class="superscript-7-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary superscript-8-shortcut editor-button-group-btn">
-              <a class="superscript-8-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary superscript-9-shortcut editor-button-group-btn">
-              <a class="superscript-9-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary superscript-0-shortcut editor-button-group-btn">
-              <a class="superscript-0-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary disjunction-shortcut editor-button-group-btn">
-              <a class="disjunction-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary conditional-shortcut editor-button-group-btn">
-              <a class="conditional-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary existential-quantifier-shortcut editor-button-group-btn">
-              <a class="existential-quantifier-token"></a>
-            </button>
-            <button type="button" class="btn btn-primary universal-quantifier-shortcut editor-button-group-btn">
-              <a class="universal-quantifier-token"></a>
-            </button>
+
+    <div class="ui grid">
+      <div class="left floated eight wide column">
+        <h2 class="ui header">
+          <div class="content">About</div>
+        </h2>
+        logic-rs is a parser of relational predicate logic and truth tree solver written
+        in Rust. This page provides the frontend to it. <br />
+        Being heavily influenced by the book <em>Meaning and Argument: An Introduction To Logic
+          Through Language</em>, by Ernest Lepore and Sam Cumming, and trying to follow as closely
+        as possible its grammar and rules, it:
+        <ul class="ui list">
+          <li>provides syntax to distinguish between
+            statement sets, arguments, and single statements as input</li>
+          <li>
+            produces detailed truth trees
+          </li>
+          <li>
+            analyses the truth trees to auto-check the consistency of statement sets, the formal validity of
+            arguments, and the logical properties of statements, namely contradiction, tautology,
+            and contingency.
+          </li>
+        </ul>
+        You're welcome to <a href="https://github.com/ixjf/logic-rs">view and contribute to the
+          project on GitHub</a>. Both the website and library are hosted there.
+      </div>
+      <div class="right floated eight wide column">
+        <h2 class="ui header">
+          <div class="content">Usage</div>
+        </h2>
+        In the editor above, you can type in either a statement set, an argument, or a single statement,
+        following the grammar as specified <a href="https://github.com/ixjf/logic-rs/wiki/Language">
+          here</a>. <br />Because that's slightly too big to skim through for everyday use, below
+        is a somewhat simplified grammar. <br /><br />
+        <button class="ui button" id="show-grammar-modal">Simplified grammar</button>
+        <br /><br />
+        Once you're finished, click "Solve" at the top-right corner of the editor's toolbar and you should
+        see the result. A detailed truth tree should appear. If it is too large, you can zoom in and out
+        with your scroll wheel, as well as move it around with your mouse. <br /> <br />
+        In order to type in the Unicode tokens, either use the buttons on the toolbar, or use
+        the available keyboard shortcuts. You can find the keyboard shortcut for each token by
+        hovering over each button on the toolbar. <br /> <br />
+
+
+        <div class="ui longer modal" id="grammar-modal">
+          <i class="close icon"></i>
+          <div class="header">
+            Grammar
           </div>
-          <textarea class="form-control" id="input-textarea"></textarea>
+          <div class="scrolling content">
+            White spaces are allowed anywhere except in between component tokens of terms and
+            component tokens of atomic formulas, namely singular statements, simple predicates
+            with terms attached, and simple statements. <br />
+            <table class="ui celled violet table">
+              <thead>
+                <tr>
+                  <th class="seven wide definition">Syntax</th>
+                  <th>Meaning</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td data-label="Syntax">
+                    <span class="grouper-opening-token"></span>&lt;formula&gt;<span class="grouper-closing-token">
+                    </span>
+                  </td>
+                  <td data-label="Meaning">Groupers. They specify precendence over connectives. They are
+                    mandatory in certain cases, like around conjunction, disjunction, and conditional
+                    formulas.
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">
+                    <span class="statement-set-opening-token"></span>&lt;statement-list&gt;<span
+                      class="statement-set-closing-token">
+                    </span>
+                  </td>
+                  <td data-label="Meaning">Statement set. The inner expression is one or more statements
+                    separated by a comma.
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">&lt;statement-list&gt; <span class="conclusion-ind-token">
+                    </span> &lt;statement&gt;</td>
+                  <td data-label="Meaning">Argument. 'statement-list' is one or more statements
+                    separated by a comma (but without a comma before the conclusion indicator),
+                    and 'statement' is a single statement.
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">A<sub>p</sub></td>
+                  <td data-label="Meaning">Simple statement. 'A' is any character from 'A' to 'Z', and 'p'
+                    any positive integer. 'p' must be in Unicode subscript and cannot have leading zeros. A
+                    simple statement is a formula.
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">
+                    <span class="grouper-opening-token"></span>&lt;formula&gt; <span class="conjunction-token"></span>
+                    &lt;formula&gt;<span class="grouper-closing-token">
+                    </span>
+                  </td>
+                  <td data-label="Meaning">Conjunction of formulas. If both formulas are statements,
+                    the resulting expression is a complex statement. If both formulas are predicates,
+                    the resulting expression is a compound predicate. In either case, the resulting
+                    expression is a formula.
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">
+                    <span class="negation-token"></span>&lt;formula&gt;
+                  </td>
+                  <td data-label="Meaning">Negation of a formula. If the formula is a statement,
+                    the resulting expression is a complex statement. If the formula is a predicate,
+                    the resulting expression is a compound predicate. In either case, the resulting
+                    expression is a formula.
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">
+                    <span class="grouper-opening-token"></span>&lt;formula&gt; <span class="disjunction-token"></span>
+                    &lt;formula&gt;<span class="grouper-closing-token">
+                    </span>
+                  </td>
+                  <td data-label="Meaning">Disjunction of formulas. If both formulas are statements,
+                    the resulting expression is a complex statement. If both formulas are predicates,
+                    the resulting expression is a compound predicate. In either case, the resulting
+                    expression is a formula.
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">
+                    <span class="grouper-opening-token"></span>&lt;formula&gt; <span class="conditional-token"></span>
+                    &lt;formula&gt;<span class="grouper-closing-token">
+                    </span>
+                  </td>
+                  <td data-label="Meaning">Conditional over formulas. If both formulas are statements,
+                    the resulting expression is a complex statement. If both formulas are predicates,
+                    the resulting expression is a compound predicate. In either case, the resulting
+                    expression is a formula.
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">a<sub>p</sub></td>
+                  <td data-label="Meaning">Singular term. 'a' is any character ranging from 'a' to 'w',
+                    and 'p' is any positive integer in Unicode subscript without leading zeros.
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">A<sub>p</sub><sup>q</sup>a<sub>0</sub>a<sub>1</sub>..a<sub>n</sub></td>
+                  <td data-label="Meaning">Simple predicate/singular statement, where 'A' is any character from
+                    'A' to 'Z', 'p' is any number in Unicode subscript without leading zeros, 'q' is any
+                    positive integer in Unicode superscript without leading zeros ('q' represents the degree
+                    of the predicate, i.e. the number of terms attached), and
+                    'a<sub>0</sub>a<sub>1</sub>..a<sub>n</sub>'
+                    is one or more terms (singular terms & variables) attached to this predicate. If all terms are
+                    singular terms, then this is a singular statement, not a simple predicate.
+                  </td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">
+                    <span class="grouper-opening-token"></span><span class="existential-token"></span>x<span
+                      class="grouper-closing-token"></span>&lt;formula&gt;<br />
+                    <span class="existential-token"></span>x&lt;formula&gt;
+                  </td>
+                  <td data-label="Meaning">Existential statement. 'x' is any variable.</td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">
+                    <span class="grouper-opening-token"></span><span class="universal-token"></span>x<span
+                      class="grouper-closing-token"></span>&lt;formula&gt;<br />
+                    <span class="universal-token"></span>x&lt;formula&gt;
+                  </td>
+                  <td data-label="Meaning">Universal statement. 'x' is any variable.</td>
+                </tr>
+                <tr>
+                  <td data-label="Syntax">x<sub>0</sub></td>
+                  <td data-label="Meaning">Variable. 'x' is any character from 'x' to 'z', and '0'
+                    any positive integer in Unicode subscript without leading zeros.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-
-      <div class="d-flex justify-content-center">
-        <button type="button" class="btn-lg btn-dark" id="run-btn">Run</button>
-      </div>
-
-      <br />
-
-      <div class="alert" hidden="true" role="alert" id="alert">
-        <h4 class="alert-heading" id="alert-heading"></h4>
-        <pre><a id="alert-message"></a></pre>
-      </div>
-
-      <div id="truth-tree" class="truth-tree"></div>
-    </form>
+    </div>
   </div>
-
-  <script type="module">
-    import { tokens } from './tokens.js';
-    import { keysMap } from './keysmap.js';
-    import { swapObjectKeyValue } from './obj_utils.js';
-
-    window.onload = function () {
-      var tokenMappings = {
-        '.conclusion-indicator-token': tokens.conclusionIndicator,
-        '.subscript-1-token': tokens.subscriptNumber1,
-        '.subscript-2-token': tokens.subscriptNumber2,
-        '.subscript-3-token': tokens.subscriptNumber3,
-        '.subscript-4-token': tokens.subscriptNumber4,
-        '.subscript-5-token': tokens.subscriptNumber5,
-        '.subscript-6-token': tokens.subscriptNumber6,
-        '.subscript-7-token': tokens.subscriptNumber7,
-        '.subscript-8-token': tokens.subscriptNumber8,
-        '.subscript-9-token': tokens.subscriptNumber9,
-        '.subscript-0-token': tokens.subscriptNumber0,
-        '.superscript-1-token': tokens.superscriptNumber1,
-        '.superscript-2-token': tokens.superscriptNumber2,
-        '.superscript-3-token': tokens.superscriptNumber3,
-        '.superscript-4-token': tokens.superscriptNumber4,
-        '.superscript-5-token': tokens.superscriptNumber5,
-        '.superscript-6-token': tokens.superscriptNumber6,
-        '.superscript-7-token': tokens.superscriptNumber7,
-        '.superscript-8-token': tokens.superscriptNumber8,
-        '.superscript-9-token': tokens.superscriptNumber9,
-        '.superscript-0-token': tokens.superscriptNumber0,
-        '.disjunction-token': tokens.disjunction,
-        '.conditional-token': tokens.conditional,
-        '.existential-quantifier-token': tokens.existentialQuantifier,
-        '.universal-quantifier-token': tokens.universalQuantifier,
-      };
-
-      for (var className in tokenMappings) {
-        document.querySelectorAll(className).forEach(e => {
-          e.innerHTML = tokenMappings[className];
-        });
-      }
-
-      var swappedKeysMap = swapObjectKeyValue(keysMap);
-
-      var keyShortcutMappings = {
-        '.conclusion-indicator-shortcut': swappedKeysMap[tokens.conclusionIndicator],
-        '.subscript-1-shortcut': swappedKeysMap[tokens.subscriptNumber1],
-        '.subscript-2-shortcut': swappedKeysMap[tokens.subscriptNumber2],
-        '.subscript-3-shortcut': swappedKeysMap[tokens.subscriptNumber3],
-        '.subscript-4-shortcut': swappedKeysMap[tokens.subscriptNumber4],
-        '.subscript-5-shortcut': swappedKeysMap[tokens.subscriptNumber5],
-        '.subscript-6-shortcut': swappedKeysMap[tokens.subscriptNumber6],
-        '.subscript-7-shortcut': swappedKeysMap[tokens.subscriptNumber7],
-        '.subscript-8-shortcut': swappedKeysMap[tokens.subscriptNumber8],
-        '.subscript-9-shortcut': swappedKeysMap[tokens.subscriptNumber9],
-        '.subscript-0-shortcut': swappedKeysMap[tokens.subscriptNumber0],
-        '.superscript-1-shortcut': swappedKeysMap[tokens.superscriptNumber1],
-        '.superscript-2-shortcut': swappedKeysMap[tokens.superscriptNumber2],
-        '.superscript-3-shortcut': swappedKeysMap[tokens.superscriptNumber3],
-        '.superscript-4-shortcut': swappedKeysMap[tokens.superscriptNumber4],
-        '.superscript-5-shortcut': swappedKeysMap[tokens.superscriptNumber5],
-        '.superscript-6-shortcut': swappedKeysMap[tokens.superscriptNumber6],
-        '.superscript-7-shortcut': swappedKeysMap[tokens.superscriptNumber7],
-        '.superscript-8-shortcut': swappedKeysMap[tokens.superscriptNumber8],
-        '.superscript-9-shortcut': swappedKeysMap[tokens.superscriptNumber9],
-        '.superscript-0-shortcut': swappedKeysMap[tokens.superscriptNumber0],
-        '.disjunction-shortcut': swappedKeysMap[tokens.disjunction],
-        '.conditional-shortcut': swappedKeysMap[tokens.conditional],
-        '.existential-quantifier-shortcut': swappedKeysMap[tokens.existentialQuantifier],
-        '.universal-quantifier-shortcut': swappedKeysMap[tokens.universalQuantifier],
-      };
-
-      for (var className in keyShortcutMappings) {
-        document.querySelectorAll(className).forEach(e => {
-          e.setAttribute("title", keyShortcutMappings[className]);
-        })
-      }
-    }
-  </script>
+  </div>
 </body>
 
 </html>

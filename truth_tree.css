@@ -1,0 +1,30 @@
+.truth-tree {
+    background: white;
+
+    --statement-text-colour: #343434;
+    --statement-text-size: 16;
+    --statement-text-face: arial;
+
+    --branch-close-icon-face: Ionicons;
+    --branch-close-icon-code: f12a;
+    --branch-close-icon-size: 20;
+    --branch-close-icon-colour: black;
+
+    --edge-colour: black;
+
+    --linenumber-text-face: arial;
+    --linenumber-text-size: 16px;
+    --linenumber-text-colour: #343434;
+    
+    --derivedfrom-text-face: arial;
+    --derivedfrom-text-size: 16px;
+    --derivedfrom-text-colour: #343434;
+    
+    --level-separation: 22;
+    --node-spacing: 75;
+
+    --checkmark-icon-size: 16;
+    --checkmark-icon-face: Ionicons;
+    --checkmark-icon-code: f122;
+    --checkmark-icon-colour: black;
+}

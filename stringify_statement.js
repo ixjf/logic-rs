@@ -1,4 +1,4 @@
-import { tokens } from './tokens';
+import { tokens } from './tokens.js';
 
 export default function statementIntoText(statement) {
     if (statement["Simple"]) {
@@ -45,7 +45,7 @@ function subscriptNumberIntoText(number) {
         } else if (v == '9') {
             return tokens.subscriptNumber9;
         }
-    });
+    }).join('');
 }
 
 function simpleStatementIntoText(statement) {
@@ -81,7 +81,7 @@ function superscriptNumberIntoText(number) {
         } else if (v == '9') {
             return tokens.superscriptNumber9;
         }
-    });
+    }).join('');
 }
 
 function predicateLetterIntoText(pred_letter) {

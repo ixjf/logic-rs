@@ -1,10 +1,8 @@
-import Map from './map_utils';
-import { objectCompareByValue } from './obj_utils';
+import { mapFindByObjectIndex, objectCompareByValue } from './helpers.js';
 import statementIntoText from './stringify_statement';
 import ruleNameToLabel from './stringify_rule';
 import { DataSet, Network } from 'vis/index-network';
-import './css/truth_tree.css';
-import 'ionicons/dist/css/ionicons.min.css';
+import './truth_tree.css';
 
 // TODO: To "move" the edges' origin points to under the text (rather than its center):
 // Create an intermediary node with no text, add a hidden edge from the original node
@@ -16,10 +14,10 @@ import 'ionicons/dist/css/ionicons.min.css';
 // and the second unnecessarily slow.
 
 export default class TruthTree {
-  constructor() {
+  constructor(container, data) {
     this.network = null;
 
-    this.container = document.getElementById('truth-tree');
+    this.container = container;
 
     this.css = {
       'statement-text-colour': this._cssValue('--statement-text-colour'),
@@ -36,11 +34,12 @@ export default class TruthTree {
       'derivedfrom-text-face': this._cssValue('--derivedfrom-text-face'),
       'derivedfrom-text-size': parseInt(this._cssValue('--derivedfrom-text-size')),
       'derivedfrom-text-colour': this._cssValue('--derivedfrom-text-colour'),
+      'checkmark-icon-size': parseInt(this._cssValue('--checkmark-icon-size')),
+      'checkmark-icon-face': this._cssValue('--checkmark-icon-face'),
+      'checkmark-icon-code': String.fromCharCode(parseInt(this._cssValue('--checkmark-icon-code'), 16)),
+      'checkmark-icon-colour': this._cssValue('--checkmark-icon-colour'),
       'level-separation': parseInt(this._cssValue('--level-separation')),
       'node-spacing': parseInt(this._cssValue('--node-spacing')),
-      'checkmark-size': parseInt(this._cssValue('--checkmark-size')),
-      'checkmark-face': this._cssValue('--checkmark-face'),
-      'checkmark-icon-code': String.fromCharCode(parseInt(this._cssValue('--checkmark-icon-code'), 16))
     }
 
     this.options = {
@@ -82,6 +81,8 @@ export default class TruthTree {
     };
 
     this.idCounter = 0;
+
+    this._render(data);
   }
 
   _parseBranchData(mapIds, branchData, parent) {
@@ -123,8 +124,8 @@ export default class TruthTree {
       var derivationId = nodeData.derived_from.derivation_id;
 
       node.derivedFrom = {
-        node: mapIds.findByObjectIndex(derivedFromNodeId),
-        branch: mapIds.findByObjectIndex(derivedFromBranchId),
+        node: mapFindByObjectIndex(mapIds, derivedFromNodeId),
+        branch: mapFindByObjectIndex(mapIds, derivedFromBranchId),
         rule: ruleNameToLabel(derivedWithRule),
         derivationId
       }
@@ -163,7 +164,7 @@ export default class TruthTree {
 
       branch.nodes.forEach(node => {
         if (node.derivedFrom != null) {
-          var derivs = mapDerivations.findByObjectIndex(node.derivedFrom.derivationId);
+          var derivs = mapFindByObjectIndex(mapDerivations, node.derivedFrom.derivationId);
           if (derivs != null) {
             if (!derivs.find(x => x.ownerBranch == node.ownerBranch)) {
               derivs.push(node);
@@ -222,7 +223,7 @@ export default class TruthTree {
         if (node.derivedFrom == null) {
           node.treeLevel = currLevel;
         } else {
-          var derivs = mapDerivations.findByObjectIndex(node.derivedFrom.derivationId);
+          var derivs = mapFindByObjectIndex(mapDerivations, node.derivedFrom.derivationId);
 
           derivs.filter(x => objectCompareByValue(x.derivedFrom.derivationId, node.derivedFrom.derivationId)).forEach(x => {
             if (x.treeLevel == null) {
@@ -385,48 +386,60 @@ export default class TruthTree {
   }
 
   _renderDoneCheckMark(ctx, xRightBound, y) { // see _renderLineNumber for xRightBound
-    ctx.font = this.css['checkmark-size'].toString().concat('px ', this.css['checkmark-face']);
-    ctx.fillStyle = this.css['checkmark-colour'];
+    ctx.font = this.css['checkmark-icon-size'].toString().concat('px ', this.css['checkmark-icon-face']);
+    ctx.fillStyle = this.css['checkmark-icon-colour'];
 
     var text = this.css['checkmark-icon-code'];
     var textWidth = ctx.measureText(text).width;
 
     ctx.fillText(text, xRightBound - textWidth, y);
+
+    return textWidth;
   }
 
   _renderLeftGutter(ctx, dataSet) {
-    // Find the leftmost boundary to the tree in canvas space
-    var leftmostBoundX = window.innerWidth; // Some large value
-    dataSet.nodes.forEach(node => {
-      var leftBound = this.network.getBoundingBox(node.id).left;
-      leftmostBoundX = Math.min(leftmostBoundX, leftBound);
-    });
+    var treeBoundingBox = this._getTreeBoundingBox(dataSet);
 
-    // TODO: Should I bother ignoring already handled nodes from same level?
-
-    // Draw line numbers from ]-infinity, leftmostBoundX] and check marks
+    // Draw line numbers from ]-infinity, treeBoundingBox.left] and check marks
     // for nodes that have had a rule applied to them already (except
     // for UQ)
-    dataSet.nodes.forEach(node => {
+    var maxWidthUsed = 0;
+
+    var distinctLevels = dataSet.nodes.distinct('level');
+
+    distinctLevels.forEach(level => {
+      // Find first for some level 'level' (left gutter is the same for all in the
+      // same level)
+      var node = dataSet.nodes.get({
+        filter: x => { return x.level == level }
+      })[0];
+
       if (node.nodeRef != null) {
+        // All nodes on same level are on same Y
         var nodeOriginY = this._calculateNodeOriginY(node.id);
 
         var lineNumberTextWidth = this._renderLineNumber(
           ctx,
           node.lineNumber,
-          leftmostBoundX,
+          treeBoundingBox.left,
           nodeOriginY
         );
 
+        var checkMarkWidth = 0;
+
         if (node.nodeRef.done) {
-          this._renderDoneCheckMark(
+          checkMarkWidth = this._renderDoneCheckMark(
             ctx,
-            leftmostBoundX - lineNumberTextWidth - 5, // - 5 for spacing
+            treeBoundingBox.left - lineNumberTextWidth - 5, // - 5 for spacing
             nodeOriginY
           );
         }
+
+        maxWidthUsed = Math.max(maxWidthUsed, lineNumberTextWidth + checkMarkWidth);
       }
     });
+
+    return maxWidthUsed;
   }
 
   // Calculates the position on the Y axis of the origin of any given node
@@ -438,12 +451,7 @@ export default class TruthTree {
 
   // Renders '<derived from ...>' data on every line
   _renderRightGutter(ctx, dataSet) {
-    // Find the rightmost boundary to the tree in canvas space
-    var rightmostBoundX = -window.innerWidth; // Some large negative value
-    dataSet.nodes.forEach(node => {
-      var rightBound = this.network.getBoundingBox(node.id).right;
-      rightmostBoundX = Math.max(rightmostBoundX, rightBound);
-    });
+    var treeBoundingBox = this._getTreeBoundingBox(dataSet);
 
     // At any one level, all statements are derived from the same one
     // statement, hence derivation data will be the same
@@ -462,6 +470,8 @@ export default class TruthTree {
     ctx.fillStyle = this.css['derivedfrom-text-colour'];
     ctx.textBaseline = 'middle'; // Absolutely critical (in order to really center the text)
 
+    var maxWidthUsed = 0;
+
     Object.values(data).forEach(levelData => {
       // Get the center Y position for this level
       var y = this._calculateNodeOriginY(levelData.nodeId);
@@ -471,28 +481,86 @@ export default class TruthTree {
 
       var text = ['(', lineNumber, ', ', rule, ')'].join('');
 
-      ctx.fillText(text, rightmostBoundX, y);
+      ctx.fillText(text, treeBoundingBox.right, y);
+
+      maxWidthUsed = Math.max(maxWidthUsed, ctx.measureText(text).width);
     });
+
+    return maxWidthUsed;
   }
 
-  render(data) {
-    this.idCounter = 0;
+  _getTreeBoundingBox(dataSet) {
+    var boundingBox = {
+      left: 1e9,
+      top: 1e9, // Same
+      right: -1e9, // Some random large negative value
+      bottom: -1e9,
+    };
 
+    dataSet.nodes.forEach(node => {
+      var networkBoundingBox = this.network.getBoundingBox(node.id);
+
+      boundingBox.right = Math.max(boundingBox.right, networkBoundingBox.right);
+      boundingBox.left = Math.min(boundingBox.left, networkBoundingBox.left);
+      boundingBox.bottom = Math.max(boundingBox.bottom, networkBoundingBox.bottom);
+      boundingBox.top = Math.min(boundingBox.top, networkBoundingBox.top);
+    });
+
+    return boundingBox;
+  }
+
+  _render(data) {
     var [dataSet, mainTrunk] = this._compute(data);
 
-    if (this.network != null) {
-      this.network.destroy();
+    // If the div container does not have a width/height > 0,
+    // the canvas will be in a failed state and we won't
+    // be able to render
+    if (this.container.style.width == 0 || this.container.style.height == 0) {
+      this.container.style.width = '10px';
+      this.container.style.height = '10px';
     }
 
     this.network = new Network(this.container, dataSet, this.options);
 
-    this.network.on('afterDrawing', ctx => {
-      this._renderLeftGutter(ctx, dataSet);
+    var alreadyAdjusted = false;
 
-      this._renderRightGutter(
+    this.network.on('afterDrawing', ctx => {
+      // Neither gutter ever increases the height of the tree
+      // so we only take into account the additional width
+      var leftGutterWidth = this._renderLeftGutter(ctx, dataSet);
+
+      var rightGutterWidth = this._renderRightGutter(
         ctx,
         dataSet
       );
+
+      // I don't think there's any better way to do this.
+      // In order to adapt the container's size to the tree size,
+      // we need to first render the tree, then get its max size,
+      // update the container's size, and rerender. All the computations
+      // are already done - it's really just redrawing.
+      // I can adjust max-height and max-width for the container
+      // so that it won't overflow.
+      if (!alreadyAdjusted) {
+        alreadyAdjusted = true;
+
+        var boundingBox = this._getTreeBoundingBox(dataSet);
+
+        var treeWidth = boundingBox.right - boundingBox.left;
+        var treeHeight = boundingBox.bottom - boundingBox.top;
+
+        treeWidth += leftGutterWidth + rightGutterWidth;
+
+        treeWidth = Math.ceil(treeWidth);
+        treeHeight = Math.ceil(treeHeight);
+
+        this.container.style.width = treeWidth.toString() + 'px';
+        this.container.style.height = treeHeight.toString() + 'px';
+
+        this.network.redraw();
+        this.network.fit(); // This doesn't actually take into account
+        // any post-rendering
+      }
     });
   }
 }

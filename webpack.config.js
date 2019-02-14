@@ -9,7 +9,11 @@ module.exports = {
   },
   mode: "development",
   plugins: [
-    new CopyWebpackPlugin(['index.html'])
+    new CopyWebpackPlugin(
+      [
+        'index.html',
+      ]
+    )
   ],
   module: {
     rules: [
@@ -22,5 +26,5 @@ module.exports = {
         loader: "file-loader"
       }
     ]
-  }
+  },
 };

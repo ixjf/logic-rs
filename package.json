@@ -23,11 +23,11 @@
   },
   "dependencies": {
     "@types/codemirror": "0.0.71",
-    "bootstrap": "^4.2.1",
     "codemirror": "^5.43.0",
+    "cookies-js": "^1.2.3",
     "css-loader": "^2.1.0",
     "file-loader": "^3.0.1",
-    "ionicons": "^4.5.5",
+    "fomantic-ui": "^2.7.2",
     "jquery": "^3.3.1",
     "popper.js": "^1.14.7",
     "style-loader": "^0.23.1",
