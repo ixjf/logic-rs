@@ -21,7 +21,7 @@ pub enum Rule {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-struct QueueNode {
+struct QueueEntry {
     statement_id: Id,
     statement: Statement,
     rule: Option<(Rule, bool)>,
@@ -33,8 +33,8 @@ struct QueueNode {
                        // any more rules in order to stop the algorithm)
 }
 
-impl Ord for QueueNode {
-    fn cmp(&self, other: &QueueNode) -> Ordering {
+impl Ord for QueueEntry {
+    fn cmp(&self, other: &QueueEntry) -> Ordering {
         // Priority order, top should come first, bottom last
         // There is a reason for this order.
         // 1. QE can potentially add new EQs to the tree
@@ -83,23 +83,24 @@ impl Ord for QueueNode {
             Rule::UniversalQuantifier,
         ];
 
-        // TODO I think this might be redundant considering the change
-        // as explained above
+        // NOTE This is pointless since UQ is already the last rule of all
+        // to be applied and the queue already follows FIFO when
+        // comparing two entries with same rule
         // Whichever failed the last time shall come last as well
         // (see end of 'compute' method for details)
-        match (self.failed_last, other.failed_last) {
-            (true, false) => {
-                return Ordering::Less;
-            }
-            (false, true) => {
-                return Ordering::Greater;
-            }
-            (true, true) => {
-                return Ordering::Equal;
-            }
-            // ^ If both failed last, follow insertion order (FIFO)
-            (false, false) => {}
-        }
+        // match (self.failed_last, other.failed_last) {
+        //     (true, false) => {
+        //         return Ordering::Less;
+        //     }
+        //     (false, true) => {
+        //         return Ordering::Greater;
+        //     }
+        //     (true, true) => {
+        //         return Ordering::Equal;
+        //     }
+        //     // ^ If both failed last, follow insertion order (FIFO)
+        //     (false, false) => {}
+        // }
 
         match (&self.rule, &other.rule) {
             // Atomic statements should come first in the queue
@@ -122,8 +123,8 @@ impl Ord for QueueNode {
     }
 }
 
-impl PartialOrd for QueueNode {
-    fn partial_cmp(&self, other: &QueueNode) -> Option<Ordering> {
+impl PartialOrd for QueueEntry {
+    fn partial_cmp(&self, other: &QueueEntry) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
@@ -166,12 +167,10 @@ impl TruthTreeMethod {
             .branch_from_id(&self.tree.main_trunk_id())
             .statements()
         {
-            let rule = self.matches_some_rule(&tree_node.statement);
-
-            queue.push(QueueNode {
+            queue.push(QueueEntry {
                 statement_id: statement_id.clone(),
                 statement: tree_node.statement.clone(),
-                rule,
+                rule: self.matches_some_rule(&tree_node.statement),
                 branch_id: self.tree.main_trunk_id(),
                 failed_last: false,
             });
@@ -179,7 +178,7 @@ impl TruthTreeMethod {
 
         // All nodes on the queue are already on the tree
         // A node represents some statement that needs to have a rule applied to it
-        'outer: while let Some(QueueNode {
+        'outer: while let Some(QueueEntry {
             statement_id,
             statement,
             rule,
@@ -187,12 +186,6 @@ impl TruthTreeMethod {
             mut failed_last,
         }) = queue.pop()
         {
-            // FIXME: This probably is pointless now
-            /*if !self.tree.is_open() {
-                // There are no open branches in the entire tree, stop
-                break;
-            }*/
-
             match rule {
                 Some((rule, repeat)) => {
                     // Open child branches of branch where original statement is
@@ -277,7 +270,7 @@ impl TruthTreeMethod {
                                     };
 
                                     // Add derived statement to queue for further processing
-                                    let new_node = QueueNode {
+                                    let new_node = QueueEntry {
                                         statement_id: derived_statement_id,
                                         statement: x.clone(),
                                         rule: self.matches_some_rule(&x),
@@ -304,7 +297,7 @@ impl TruthTreeMethod {
                                     queue
                                         .into_vec()
                                         .iter()
-                                        .map(|x| QueueNode {
+                                        .map(|x| QueueEntry {
                                             failed_last: false,
                                             ..x.clone()
                                         })
@@ -328,9 +321,6 @@ impl TruthTreeMethod {
                                     if !queue.iter().any(|x| !x.failed_last) {
                                         break 'outer;
                                     }
-
-                                    // FIXME This doesn't solve infinitely recursive trees
-                                    // where you're stuck in a cycle of EQ -> UQ -> EQ
                                 }
 
                                 // Since we've reached here, there are other rules that may yet be applied
@@ -340,7 +330,7 @@ impl TruthTreeMethod {
 
                                 // Important: we won't run into an infinite loop where there are branching rules
                                 // to be applied but that can't because the queue pops UQ first all the time,
-                                // because the impl for the Ord trait on QueueNode makes sure that if
+                                // because the impl for the Ord trait on QueueEntry makes sure that if
                                 // the rule has failed_last set, it'll always come after ALL other rules.
                                 // Since UQ is the only repeat rule, we're safe
                                 failed_last = true;
@@ -350,7 +340,7 @@ impl TruthTreeMethod {
 
                     if repeat {
                         // See right above, if we reached here, we're safe
-                        queue.push(QueueNode {
+                        queue.push(QueueEntry {
                             statement_id,
                             statement,
                             rule: Some((rule.clone(), repeat)),
@@ -1031,7 +1021,7 @@ mod tests {
     };
 
     #[test]
-    fn queue_node_priority_order_correct() {
+    fn queue_entry_priority_order_correct() {
         let branch = Branch::new(vec![BranchNode {
             statement: Statement::Simple(SimpleStatementLetter('A', Subscript(None))),
             derived_from: None,
@@ -1042,7 +1032,7 @@ mod tests {
         let mut queue = BinaryHeap::new();
 
         // Unordered pushes
-        queue.push(QueueNode {
+        queue.push(QueueEntry {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
             rule: Some((Rule::Conjunction, false)),
@@ -1050,7 +1040,7 @@ mod tests {
             failed_last: false,
         });
 
-        queue.push(QueueNode {
+        queue.push(QueueEntry {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
             rule: Some((Rule::QuantifierExchange, false)),
@@ -1058,7 +1048,7 @@ mod tests {
             failed_last: false,
         });
 
-        queue.push(QueueNode {
+        queue.push(QueueEntry {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
             rule: Some((Rule::DoubleNegation, false)),
@@ -1066,7 +1056,7 @@ mod tests {
             failed_last: false,
         });
 
-        queue.push(QueueNode {
+        queue.push(QueueEntry {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
             rule: Some((Rule::ExistentialQuantifier, false)),
@@ -1074,7 +1064,7 @@ mod tests {
             failed_last: false,
         });
 
-        queue.push(QueueNode {
+        queue.push(QueueEntry {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
             rule: Some((Rule::NegationOfDisjunction, false)),
@@ -1082,7 +1072,7 @@ mod tests {
             failed_last: false,
         });
 
-        queue.push(QueueNode {
+        queue.push(QueueEntry {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
             rule: Some((Rule::Disjunction, false)),
@@ -1090,7 +1080,7 @@ mod tests {
             failed_last: false,
         });
 
-        queue.push(QueueNode {
+        queue.push(QueueEntry {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
             rule: Some((Rule::UniversalQuantifier, true)),
@@ -1098,7 +1088,7 @@ mod tests {
             failed_last: false,
         });
 
-        queue.push(QueueNode {
+        queue.push(QueueEntry {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
             rule: Some((Rule::NegationOfConjunction, false)),
@@ -1106,7 +1096,7 @@ mod tests {
             failed_last: false,
         });
 
-        queue.push(QueueNode {
+        queue.push(QueueEntry {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
             rule: Some((Rule::NegationOfConditional, false)),
@@ -1114,7 +1104,7 @@ mod tests {
             failed_last: false,
         });
 
-        queue.push(QueueNode {
+        queue.push(QueueEntry {
             statement_id: mock_id.clone(),
             statement: mock_statement.clone(),
             rule: Some((Rule::Conditional, false)),
