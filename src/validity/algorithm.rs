@@ -28,7 +28,9 @@ struct QueueNode {
     branch_id: Id,
     failed_last: bool, // Indicates whether the rule was applied successfully the last time
                        // Useful for recursive rules where we need to avoid infinite loops if no rule in the queue
-                       // can be applied any longer.
+                       // can be applied any longer. (e.g. UQ - it can never be removed from the queue
+                       // as it may be applicable anytime, but we also need to know if we can't apply
+                       // any more rules in order to stop the algorithm)
 }
 
 impl Ord for QueueNode {
@@ -42,7 +44,7 @@ impl Ord for QueueNode {
         // 2. EQ adds new singular terms, which UQ depends on.
         // The sooner we add those singular terms to the stack,
         // the sooner we may be able to close the tree
-        // 3. UQ should come last out of all branching rules
+        // 3. UQ should come last out of all non-branching rules
         // since we want to apply UQ to one singular term and move on,
         // and come back later (if we instantiate UQ to all singular terms
         // on the branch at once, we then can't close the tree until
@@ -52,19 +54,37 @@ impl Ord for QueueNode {
         // since it'll be the first one out.
         // 4. Non-branching rules before branching rules because, again,
         // we want to keep the truth tree as compact as possible
+        //
+        // Above is defined the order as the book puts it. However:
+        // There _is_ a difference between this order and the order
+        // as defined in the book, and that is the order of QE, EQ,
+        // and UQ rules in relation to all others. If non-branching rules are to be applied _before_
+        // branching rules, then these rules I mentioned should come
+        // before branching rules. However, and according to this:
+        // http://www.cogsci.rpi.edu/~heuveb/teaching/Logic/CompLogic/Web/Handouts/FO-Completeness-Truth-Tree.pdf
+        // if we move quantifier rules to the end, even after
+        // branching rules, then (if there is no mistake in the algorithm)
+        // we can guarantee that if the algorithm generates an infinite
+        // tree, then the initial set of statements is satisfiable.
+        // The problem of knowing whether we are facing an infinite truth tree
+        // remains, but at least we can be certain that if we have an
+        // unsatisfiable initial set of statements, then our algorithm
+        // will generate a closed tree.
         let rule_priority_order: [Rule; 10] = [
-            Rule::QuantifierExchange,
-            Rule::ExistentialQuantifier,
             Rule::DoubleNegation,
             Rule::Conjunction,
             Rule::NegationOfConditional,
             Rule::NegationOfDisjunction,
-            Rule::UniversalQuantifier,
             Rule::Conditional,
             Rule::NegationOfConjunction,
             Rule::Disjunction,
+            Rule::QuantifierExchange,
+            Rule::ExistentialQuantifier,
+            Rule::UniversalQuantifier,
         ];
 
+        // TODO I think this might be redundant considering the change
+        // as explained above
         // Whichever failed the last time shall come last as well
         // (see end of 'compute' method for details)
         match (self.failed_last, other.failed_last) {
@@ -1104,14 +1124,6 @@ mod tests {
 
         assert_eq!(
             queue.pop().unwrap().rule,
-            Some((Rule::QuantifierExchange, false))
-        );
-        assert_eq!(
-            queue.pop().unwrap().rule,
-            Some((Rule::ExistentialQuantifier, false))
-        );
-        assert_eq!(
-            queue.pop().unwrap().rule,
             Some((Rule::DoubleNegation, false))
         );
         assert_eq!(queue.pop().unwrap().rule, Some((Rule::Conjunction, false)));
@@ -1123,16 +1135,25 @@ mod tests {
             queue.pop().unwrap().rule,
             Some((Rule::NegationOfDisjunction, false))
         );
-        assert_eq!(
-            queue.pop().unwrap().rule,
-            Some((Rule::UniversalQuantifier, true))
-        );
+
         assert_eq!(queue.pop().unwrap().rule, Some((Rule::Conditional, false)));
         assert_eq!(
             queue.pop().unwrap().rule,
             Some((Rule::NegationOfConjunction, false))
         );
         assert_eq!(queue.pop().unwrap().rule, Some((Rule::Disjunction, false)));
+        assert_eq!(
+            queue.pop().unwrap().rule,
+            Some((Rule::QuantifierExchange, false))
+        );
+        assert_eq!(
+            queue.pop().unwrap().rule,
+            Some((Rule::ExistentialQuantifier, false))
+        );
+        assert_eq!(
+            queue.pop().unwrap().rule,
+            Some((Rule::UniversalQuantifier, true))
+        );
     }
 
     #[test]

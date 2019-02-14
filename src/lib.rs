@@ -277,21 +277,4 @@ mod tests {
 
         assert_eq!(single_statement.is_contingency().0, false);
     }
-
-    #[test]
-    fn rip() {
-        match super::parse_input(
-            "(∀x)(L¹x ⊃ (∃y)(F¹y & (∃z)(T¹z & P³xyz))),\
-             (∃x)(L¹x)\
-             ∴ (∃x)(F¹x & (∃y)(T¹y & (∃z)(L¹z & P³zxy)))",
-        ) {
-            Ok(input_kind) => match input_kind {
-                InputKind::Argument(arg) => {
-                    let (_, truth_tree) = arg.is_valid();
-                }
-                _ => {}
-            },
-            Err(_) => assert!(false),
-        }
-    }
 }
