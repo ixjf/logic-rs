@@ -90,40 +90,22 @@ function _loadStoredInputFromCookies(editor) {
 }
 
 function _defaultInput() {
-    // ((∀x)(D¹x ⊃ (∀y)(C¹y ⊃ B²xy)) ⊃ (∃x₁)(C¹x₁ & (∀z)(G¹z ⊃ B²x₁z))),
-    // (∀x)(C¹x ⊃ ((∃y)(G¹y & B²xy) ⊃ K¹x))
-    // ∴ (~(∃x)(D¹x & (∃y)(C¹y & B²xy)) ⊃ (∀x)(G¹x ⊃ ~K¹x))
-    return [tokens.grouperOpening, tokens.grouperOpening, tokens.universalQuantifier,
-        'x', tokens.grouperClosing, tokens.grouperOpening, 'D', tokens.superscriptNumber1,
-        'x', ' ', tokens.conditional, ' ', tokens.grouperOpening, tokens.universalQuantifier,
-        'y', tokens.grouperClosing, tokens.grouperOpening, 'C', tokens.superscriptNumber1,
-        'y', ' ', tokens.conditional, ' ', 'B', tokens.superscriptNumber2, 'x', 'y',
-    tokens.grouperClosing, tokens.grouperClosing, ' ', tokens.conditional, ' ',
-    tokens.grouperOpening, tokens.existentialQuantifier, 'x', tokens.subscriptNumber1,
-    tokens.grouperClosing, tokens.grouperOpening, 'C', tokens.superscriptNumber1, 'x',
-    tokens.subscriptNumber1, ' ', tokens.conjunction, ' ', tokens.grouperOpening,
-    tokens.universalQuantifier, 'z', tokens.grouperClosing, tokens.grouperOpening,
-        'G', tokens.superscriptNumber1, 'z', ' ', tokens.conditional, ' ', 'B',
-    tokens.superscriptNumber2, 'x', tokens.subscriptNumber1, 'z', tokens.grouperClosing,
-    tokens.grouperClosing, tokens.grouperClosing, ',', '\n',
+    // (∀x)(H¹x ⊃ A¹x)
+    // ∴ (∀x)((P¹x & (∃z)(H¹z & O²xz)) ⊃ (∃y)(A¹y & O²xy))
+    return [
+        tokens.grouperOpening, tokens.universalQuantifier, 'x', tokens.grouperClosing,
+        tokens.grouperOpening, 'H', tokens.superscriptNumber1, 'x', ' ', tokens.conditional,
+        ' ', 'A', tokens.superscriptNumber1, 'x', tokens.grouperClosing, '\n',
 
-    tokens.grouperOpening, tokens.universalQuantifier, 'x', tokens.grouperClosing,
-    tokens.grouperOpening, 'C', tokens.superscriptNumber1, 'x', ' ', tokens.conditional,
-        ' ', tokens.grouperOpening, tokens.grouperOpening, tokens.existentialQuantifier,
-        'y', tokens.grouperClosing, tokens.grouperOpening, 'G', tokens.superscriptNumber1,
-        'y', ' ', tokens.conjunction, ' ', 'B', tokens.superscriptNumber2, 'x', 'y',
-    tokens.grouperClosing, ' ', tokens.conditional, ' ', 'K', tokens.superscriptNumber1,
-        'x', tokens.grouperClosing, tokens.grouperClosing, '\n',
-
-    tokens.conclusionIndicator, ' ', tokens.grouperOpening, tokens.negation,
-    tokens.grouperOpening, tokens.existentialQuantifier, 'x', tokens.grouperClosing,
-    tokens.grouperOpening, 'D', tokens.superscriptNumber1, 'x', ' ', tokens.conjunction,
-        ' ', tokens.grouperOpening, tokens.existentialQuantifier, 'y', tokens.grouperClosing,
-    tokens.grouperOpening, 'C', tokens.superscriptNumber1, 'y', ' ', tokens.conjunction,
-        ' ', 'B', tokens.superscriptNumber2, 'x', 'y', tokens.grouperClosing,
-    tokens.grouperClosing, ' ', tokens.conditional, ' ', tokens.grouperOpening,
-    tokens.universalQuantifier, 'x', tokens.grouperClosing, tokens.grouperOpening,
-        'G', tokens.superscriptNumber1, 'x', ' ', tokens.conditional, ' ', tokens.negation,
-        'K', tokens.superscriptNumber1, 'x', tokens.grouperClosing, tokens.grouperClosing,
+        tokens.conclusionIndicator, ' ', tokens.grouperOpening, tokens.universalQuantifier,
+        'x', tokens.grouperClosing, tokens.grouperOpening, tokens.grouperOpening,
+        'P', tokens.superscriptNumber1, 'x', ' ', tokens.conjunction, ' ', tokens.grouperOpening,
+        tokens.existentialQuantifier, 'z', tokens.grouperClosing, tokens.grouperOpening,
+        'H', tokens.superscriptNumber1, 'z', ' ', tokens.conjunction, ' ', 'O',
+        tokens.superscriptNumber2, 'x', 'z', tokens.grouperClosing, tokens.grouperClosing,
+        ' ', tokens.conditional, ' ', tokens.grouperOpening, tokens.existentialQuantifier, 'y',
+        tokens.grouperClosing, tokens.grouperOpening, 'A', tokens.superscriptNumber1, 'y',
+        ' ', tokens.conjunction, ' ', 'O', tokens.superscriptNumber2, 'x', 'y',
+        tokens.grouperClosing, tokens.grouperClosing,
     ].join('');
 }
