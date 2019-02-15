@@ -375,7 +375,7 @@ impl TruthTreeMethod {
         // to find a contradiction, however, it's easier if we accept the entire
         // branch the statement is on. After all, if there is a contradiction
         // anywhere in the branch, whether it be above or below (which can't really
-        // happen in the current state of things of 'compute'), the branch will
+        // happen in the current state of things of 'compute' anyway), the branch will
         // close.
 
         for (_, ancestor_branch) in self.tree.traverse_upwards_branches(&branch_id) {
