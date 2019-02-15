@@ -2,12 +2,12 @@ import CodeMirror from 'codemirror/lib/codemirror.js';
 import 'codemirror/lib/codemirror.css';
 import 'codemirror/addon/mode/simple.js';
 import Cookies from 'cookies-js/dist/cookies.js';
-import './editor_theme.css';
+import './css/editor_theme.css';
 import './editor_mode.js';
 import { mapObject } from './helpers.js';
 import { keysMap } from './keysmap.js';
 import { tokens } from './tokens.js';
-import { solve } from './editor_output.js';
+import { solve } from './editor_solve.js';
 
 export function loadEditor() {
     var editor = CodeMirror.fromTextArea(document.getElementById("editor"), {
@@ -23,18 +23,27 @@ export function loadEditor() {
         }),
     });
 
-    // Add tooltip with keyboard shortcuts for editor toolbar buttons
-    document.querySelectorAll('.editor-toolbar-shortcut').forEach(e => {
-        // Not all toolbar buttons have a keymap
-        var keyMap = Object.entries(keysMap).find(v => {
-            return v[1] == e.innerText;
-        });
+    // Add tooltip with keyboard shortcuts for editor toolbar buttons on PC
+    if (!(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Windows Phone/i.test(navigator.userAgent))) {
+        document.querySelectorAll('.ui.button.editor-toolbar-shortcut').forEach(e => {
+            // Not all toolbar buttons have a keymap
+            var keyMap = Object.entries(keysMap).find(v => {
+                return v[1] == e.innerText;
+            });
 
-        if (keyMap) {
-            var shortcut = keyMap[0];
-            e.setAttribute("data-tooltip", shortcut);
-        }
-    });
+            if (keyMap) {
+                var shortcut = keyMap[0];
+                e.setAttribute("data-tooltip", shortcut);
+            }
+        });
+    }
+    else {
+        // Apply fix on mobile so that toolbar doesn't overflow on really
+        // small screens
+        // This could still happen on PC if you resize the window
+        // and make it really small, but if you do that.. well, then
+        document.querySelector('.editor-toolbar').style.overflow = 'auto';
+    }
 
     _loadStoredInputFromCookies(editor);
 
@@ -52,7 +61,7 @@ function _bindUiEvents(editor) {
         });
     });
 
-    window.addEventListener('unload', () => {
+    window.addEventListener('beforeunload', () => {
         _saveInputToCookies(editor);
     });
 

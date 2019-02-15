@@ -93,11 +93,11 @@ export function solve(input) {
 }
 
 function _computeHtmlParseError(e) {
-    return '<div class="ui violet message">' +
+    return '<div class="ui negative message">' +
         '<div class="header">' +
         'Parse Error' +
         '</div>' +
-        '<pre style="white-space: pre-wrap;">' + e.message + '</pre>' +
+        '<pre style="overflow: auto;">' + e.message + '</pre>' +
         '</div>';
 }
 

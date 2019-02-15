@@ -1,5 +1,6 @@
 import './semantic/dist/semantic.min.css';
 import './semantic/dist/semantic.min.js';
+import './css/index.css';
 import { loadEditor } from './editor.js';
 import { mapHtmlTokens } from './tokens_html_map.js';
 

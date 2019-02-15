@@ -1,0 +1,39 @@
+.CodeMirror,
+.CodeMirror-scroll {
+    height: 32vh;
+    max-height: 325px;
+    max-width: 1000px;
+}
+
+@media only screen and (max-width: 1200px) {
+    .ui.icon.buttons {
+        width: 100%;
+        display: flex;
+    }
+
+    .ui.icon.buttons.editor-toolbar-1>.button {
+        width: 9.09%;
+    }
+
+    .ui.icon.buttons.editor-toolbar-2>.button {
+        width: 10%;
+    }
+
+    .ui.icon.buttons.editor-toolbar-3>.button {
+        width: 10%;
+    }
+
+    .editor-toolbar {
+        width: 100%;
+    }
+
+    #solve {
+        width: 100%;
+        margin-top: 8px;
+    }
+}
+
+.header-container {
+    padding-right: 10px;
+    padding-top: 10px;
+}

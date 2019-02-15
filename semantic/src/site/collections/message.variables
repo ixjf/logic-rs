@@ -1,3 +1,8 @@
 /*******************************
     User Variable Overrides
 *******************************/
+
+@negativeBackgroundColor : #eac7c7;
+@negativeHeaderColor     : #912D2B;
+@negativeTextColor       : #9F3A38;
+@negativeBoxShadow       : #000000;

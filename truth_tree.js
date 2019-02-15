@@ -2,7 +2,7 @@ import { mapFindByObjectIndex, objectCompareByValue } from './helpers.js';
 import statementIntoText from './stringify_statement.js';
 import ruleNameToLabel from './stringify_rule.js';
 import { DataSet, Network } from 'vis/dist/vis-network.min.js';
-import './truth_tree.css';
+import './css/truth_tree.css';
 
 export default class TruthTree {
   // nodes in 'data' are guaranteed to be in the order that they should appear and were derived,
@@ -589,6 +589,7 @@ export default class TruthTree {
   }
 }
 
+// Mock
 // new TruthTree().render({
 //   main_trunk: {
 //     id: 0,
