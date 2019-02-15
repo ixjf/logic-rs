@@ -358,7 +358,10 @@ export default class TruthTree {
       branch.children.forEach(child => {
         this._offsetLevels(child, child.nodes[0].treeLevel, 2);
 
-        var hiddenChildId = this._insertHiddenNodeOnDataSet(dataSet, last.treeLevel + 2);
+        // Children may be lower in the tree to match the lines for each derivation
+        // hence the hidden parent of the child should be only one level above the child
+        // and not last.treeLevel + 2 as you might assume
+        var hiddenChildId = this._insertHiddenNodeOnDataSet(dataSet, child.nodes[0].treeLevel - 1);
         this._insertEdgeOnDataSet(dataSet, hiddenParentId, hiddenChildId);
 
         this._populateDataSet(dataSet, child);
