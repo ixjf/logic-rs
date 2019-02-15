@@ -280,6 +280,8 @@ impl TruthTreeMethod {
                                     queue.push(new_node);
                                 }
 
+                                derivation_id.index = 0;
+
                                 failed_last = false;
 
                                 // A new node was added to the tree
