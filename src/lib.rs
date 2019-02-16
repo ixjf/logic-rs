@@ -20,9 +20,7 @@
 //! Validating some formula is as simple as:
 //!
 //! ```
-//! # use std::error::Error;
 //! # use logic_rs::parse_input;
-//! # fn main() -> Result<(), Box<Error>> {
 //! match parse_input("(∀x)(B¹x ⊃ (L²xm ⊃ L²bx))") {
 //!     Ok(input_kind) => {
 //!         // Input is a well-formed formula
@@ -31,18 +29,13 @@
 //!         // Input is **not** a well-formed formula
 //!     }
 //! }
-//! #
-//! #     Ok(())
-//! # }
 //! ```
 //!
 //! And proving that the input above is a sole statement and that that statement is a contingency
 //! is just as simple:
 //!
 //! ```
-//! # use std::error::Error;
 //! # use logic_rs::{parse_input, InputKind};
-//! # fn main() -> Result<(), Box<Error>> {
 //! match parse_input("(∀x)(B¹x ⊃ (L²xm ⊃ L²bx))") {
 //!     Ok(input_kind) => match input_kind {
 //!         InputKind::Statement(st) => {
@@ -58,9 +51,6 @@
 //!     },
 //!     Err(parse_err) => assert!(false)
 //! }
-//! #
-//! #     Ok(())
-//! # }
 //! ```
 //!
 //! Essentially, the flow is always:
