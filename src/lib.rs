@@ -2,39 +2,39 @@ extern crate console_error_panic_hook;
 extern crate wasm_bindgen;
 #[macro_use]
 extern crate serde_derive;
-extern crate logic;
+extern crate logic_rs;
 
 use wasm_bindgen::prelude::*;
 
 #[derive(Serialize)]
 struct IsConsistent {
     pub is_consistent: bool,
-    pub truth_tree: logic::TruthTree,
+    pub truth_tree: logic_rs::TruthTree,
 }
 
 #[derive(Serialize)]
 struct IsValid {
     pub is_valid: bool,
-    pub truth_tree: logic::TruthTree,
+    pub truth_tree: logic_rs::TruthTree,
 }
 
 #[derive(Serialize)]
 struct IsContradiction {
     pub is_contradiction: bool,
-    pub truth_tree: logic::TruthTree,
+    pub truth_tree: logic_rs::TruthTree,
 }
 
 #[derive(Serialize)]
 struct IsTautology {
     pub is_tautology: bool,
-    pub truth_tree: logic::TruthTree,
+    pub truth_tree: logic_rs::TruthTree,
 }
 
 #[derive(Serialize)]
 struct IsContingency {
     pub is_contingency: bool,
-    pub contradiction_truth_tree: logic::TruthTree,
-    pub tautology_truth_tree: logic::TruthTree,
+    pub contradiction_truth_tree: logic_rs::TruthTree,
+    pub tautology_truth_tree: logic_rs::TruthTree,
 }
 
 #[wasm_bindgen]
@@ -60,22 +60,22 @@ struct ParserError {
 
 #[wasm_bindgen]
 pub struct ParsedInput {
-    kind: logic::InputKind,
+    kind: logic_rs::InputKind,
 }
 
 #[wasm_bindgen]
 impl ParsedInput {
     pub fn get_kind(&self) -> InputKind {
         match self.kind {
-            logic::InputKind::StatementSet(_) => InputKind::StatementSet,
-            logic::InputKind::Argument(_) => InputKind::Argument,
-            logic::InputKind::Statement(_) => InputKind::Statement,
+            logic_rs::InputKind::StatementSet(_) => InputKind::StatementSet,
+            logic_rs::InputKind::Argument(_) => InputKind::Argument,
+            logic_rs::InputKind::Statement(_) => InputKind::Statement,
         }
     }
 
     pub fn is_consistent(&self) -> Result<JsValue, JsValue> {
         match self.kind {
-            logic::InputKind::StatementSet(ref st_set) => {
+            logic_rs::InputKind::StatementSet(ref st_set) => {
                 let (is_consistent, truth_tree) = st_set.is_consistent();
 
                 Ok(JsValue::from_serde(&IsConsistent {
@@ -90,7 +90,7 @@ impl ParsedInput {
 
     pub fn is_valid(&self) -> Result<JsValue, JsValue> {
         match self.kind {
-            logic::InputKind::Argument(ref argument) => {
+            logic_rs::InputKind::Argument(ref argument) => {
                 let (is_valid, truth_tree) = argument.is_valid();
 
                 Ok(JsValue::from_serde(&IsValid {
@@ -105,7 +105,7 @@ impl ParsedInput {
 
     pub fn is_contradiction(&self) -> Result<JsValue, JsValue> {
         match self.kind {
-            logic::InputKind::Statement(ref single_statement) => {
+            logic_rs::InputKind::Statement(ref single_statement) => {
                 let (is_contradiction, truth_tree) = single_statement.is_contradiction();
 
                 Ok(JsValue::from_serde(&IsContradiction {
@@ -120,7 +120,7 @@ impl ParsedInput {
 
     pub fn is_tautology(&self) -> Result<JsValue, JsValue> {
         match self.kind {
-            logic::InputKind::Statement(ref single_statement) => {
+            logic_rs::InputKind::Statement(ref single_statement) => {
                 let (is_tautology, truth_tree) = single_statement.is_tautology();
 
                 Ok(JsValue::from_serde(&IsTautology {
@@ -135,7 +135,7 @@ impl ParsedInput {
 
     pub fn is_contingency(&self) -> Result<JsValue, JsValue> {
         match self.kind {
-            logic::InputKind::Statement(ref single_statement) => {
+            logic_rs::InputKind::Statement(ref single_statement) => {
                 let (is_contingency, contradiction_truth_tree, tautology_truth_tree) =
                     single_statement.is_contingency();
 
@@ -157,7 +157,7 @@ pub fn parse_input(input: &str) -> Result<ParsedInput, JsValue> {
     // Gives us pretty errors on the browser console rather than just e.g. "Unreachable executed"
     console_error_panic_hook::set_once();
 
-    match logic::parse_input(input) {
+    match logic_rs::parse_input(input) {
         Ok(input_kind) => Ok(ParsedInput { kind: input_kind }),
         Err(e) => Err(JsValue::from_serde(&ParserError {
             line: e.location.0,

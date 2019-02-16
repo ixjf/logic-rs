@@ -1,17 +1,20 @@
 [package]
 name = "wasm-layer"
 version = "0.1.0"
+description = "wasm layer to communicate between the website and logic-rs"
 authors = ["Pedro Fanha <ixjf@outlook.com>"]
 edition = "2018"
+license = "MIT"
+repository = "https://github.com/ixjf/logic-rs"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-wasm-bindgen = { version = "=0.2.34", features = ["serde-serialize"] } # TODO Change back to "0.2" when wasm-bindgen is fixed
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 serde = "1.0"
 serde_derive = "1.0"
-logic = { git = "https://github.com/ixjf/logic-rs", features = ["serde_support"] }
+logic-rs = { git = "https://github.com/ixjf/logic-rs", features = ["serde_support"] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
 # logging them with `console.error`. This is great for development, but requires
