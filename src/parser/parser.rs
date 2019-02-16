@@ -2,7 +2,7 @@ use super::ast::{
     Degree, Formula, Input, ParseTree, PredicateLetter, SimpleStatementLetter, SingularTerm,
     Statement, Subscript, Term, Variable,
 };
-use super::error::Error;
+use super::error::ParseError;
 use pest::iterators::{Pair, Pairs};
 
 mod pest_parser {
@@ -21,16 +21,16 @@ impl Parser {
         Parser {}
     }
 
-    pub fn parse<'a>(&self, input: &'a str) -> Result<ParseTree, Error> {
+    pub fn parse<'a>(&self, input: &'a str) -> Result<ParseTree, ParseError> {
         use pest::Parser;
 
         match GeneratedParser::parse(Rule::input, input) {
             Ok(p) => self.into_ast(p),
-            Err(e) => Err(Error::new_from_parsing_error(e)),
+            Err(e) => Err(ParseError::new_from_parsing_error(e)),
         }
     }
 
-    fn into_ast(&self, mut pairs: Pairs<'_, Rule>) -> Result<ParseTree, Error> {
+    fn into_ast(&self, mut pairs: Pairs<'_, Rule>) -> Result<ParseTree, ParseError> {
         let inner = pairs.next().unwrap().into_inner().next().unwrap();
         match inner.as_rule() {
             Rule::statement_set => self.statement_set_into_ast(inner),
@@ -46,7 +46,7 @@ impl Parser {
         }
     }
 
-    fn statement_set_into_ast(&self, pair: Pair<Rule>) -> Result<ParseTree, Error> {
+    fn statement_set_into_ast(&self, pair: Pair<Rule>) -> Result<ParseTree, ParseError> {
         assert!(pair.as_rule() == Rule::statement_set);
 
         let mut statements = Vec::new();
@@ -61,7 +61,7 @@ impl Parser {
         Ok(ParseTree(Input::StatementSet(statements)))
     }
 
-    fn argument_into_ast(&self, pair: Pair<Rule>) -> Result<ParseTree, Error> {
+    fn argument_into_ast(&self, pair: Pair<Rule>) -> Result<ParseTree, ParseError> {
         assert!(pair.as_rule() == Rule::argument);
 
         let mut statements = Vec::new();
@@ -90,7 +90,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Statement, Error> {
+    ) -> Result<Statement, ParseError> {
         assert!(pair.as_rule() == Rule::statement);
 
         let inner = pair.into_inner().next().unwrap();
@@ -109,7 +109,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Statement, Error> {
+    ) -> Result<Statement, ParseError> {
         assert!(pair.as_rule() == Rule::complex_statement);
 
         let inner = pair.into_inner().next().unwrap();
@@ -129,7 +129,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Statement, Error> {
+    ) -> Result<Statement, ParseError> {
         assert!(pair.as_rule() == Rule::logical_conjunction);
 
         let mut inner = pair.into_inner();
@@ -147,7 +147,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Statement, Error> {
+    ) -> Result<Statement, ParseError> {
         assert!(pair.as_rule() == Rule::logical_negation);
 
         let mut inner = pair.into_inner();
@@ -161,7 +161,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Statement, Error> {
+    ) -> Result<Statement, ParseError> {
         assert!(pair.as_rule() == Rule::logical_disjunction);
 
         let mut inner = pair.into_inner();
@@ -179,7 +179,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Statement, Error> {
+    ) -> Result<Statement, ParseError> {
         assert!(pair.as_rule() == Rule::logical_conditional);
 
         let mut inner = pair.into_inner();
@@ -197,7 +197,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Statement, Error> {
+    ) -> Result<Statement, ParseError> {
         assert!(pair.as_rule() == Rule::existential_statement);
 
         let mut inner = pair.clone().into_inner();
@@ -205,7 +205,7 @@ impl Parser {
         let variable = self.variable_into_ast(inner.next().unwrap());
 
         if stack.iter().any(|x| x == &variable) {
-            return Err(Error::new_from_custom_error(
+            return Err(ParseError::new_from_custom_error(
                 pair.as_span(),
                 "variable is already bound to another quantifier",
             ));
@@ -222,7 +222,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Statement, Error> {
+    ) -> Result<Statement, ParseError> {
         assert!(pair.as_rule() == Rule::universal_statement);
 
         let mut inner = pair.clone().into_inner();
@@ -230,7 +230,7 @@ impl Parser {
         let variable = self.variable_into_ast(inner.next().unwrap());
 
         if stack.iter().any(|x| x == &variable) {
-            return Err(Error::new_from_custom_error(
+            return Err(ParseError::new_from_custom_error(
                 pair.as_span(),
                 "variable is already bound to another quantifier",
             ));
@@ -243,7 +243,7 @@ impl Parser {
         Ok(Statement::Universal(variable, Box::new(formula)))
     }
 
-    fn simple_statement_into_ast(&self, pair: Pair<Rule>) -> Result<Statement, Error> {
+    fn simple_statement_into_ast(&self, pair: Pair<Rule>) -> Result<Statement, ParseError> {
         assert!(pair.as_rule() == Rule::simple_statement);
 
         let inner = pair.into_inner().next().unwrap();
@@ -265,7 +265,7 @@ impl Parser {
         }
     }
 
-    fn singular_statement_into_ast(&self, pair: Pair<Rule>) -> Result<Statement, Error> {
+    fn singular_statement_into_ast(&self, pair: Pair<Rule>) -> Result<Statement, ParseError> {
         assert!(pair.as_rule() == Rule::singular_statement);
 
         let mut inner = pair.clone().into_inner();
@@ -280,7 +280,7 @@ impl Parser {
             .collect::<Vec<SingularTerm>>();
 
         if predicate_letter.2 != terms.len() as u64 {
-            return Err(Error::new_from_custom_error(
+            return Err(ParseError::new_from_custom_error(
                 pair.as_span(),
                 "degree doesn't match number of terms specified",
             ));
@@ -372,7 +372,7 @@ impl Parser {
         ))
     }
 
-    fn formula_into_ast(&self, pair: Pair<Rule>, stack: &Vec<Variable>) -> Result<Formula, Error> {
+    fn formula_into_ast(&self, pair: Pair<Rule>, stack: &Vec<Variable>) -> Result<Formula, ParseError> {
         assert!(pair.as_rule() == Rule::formula);
 
         let inner = pair.into_inner().next().unwrap();
@@ -391,7 +391,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Formula, Error> {
+    ) -> Result<Formula, ParseError> {
         assert!(pair.as_rule() == Rule::compound_formula);
 
         let inner = pair.into_inner().next().unwrap();
@@ -420,7 +420,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Formula, Error> {
+    ) -> Result<Formula, ParseError> {
         assert!(pair.as_rule() == Rule::compound_formula_conjunction);
 
         let mut inner = pair.into_inner();
@@ -435,7 +435,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Formula, Error> {
+    ) -> Result<Formula, ParseError> {
         assert!(pair.as_rule() == Rule::compound_formula_negation);
 
         let mut inner = pair.into_inner();
@@ -449,7 +449,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Formula, Error> {
+    ) -> Result<Formula, ParseError> {
         assert!(pair.as_rule() == Rule::compound_formula_disjunction);
 
         let mut inner = pair.into_inner();
@@ -464,7 +464,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Formula, Error> {
+    ) -> Result<Formula, ParseError> {
         assert!(pair.as_rule() == Rule::compound_formula_conditional);
 
         let mut inner = pair.into_inner();
@@ -479,7 +479,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<Formula, Error> {
+    ) -> Result<Formula, ParseError> {
         assert!(pair.as_rule() == Rule::atomic_formula);
 
         let inner = pair.into_inner().next().unwrap();
@@ -499,7 +499,7 @@ impl Parser {
         &self,
         pair: Pair<Rule>,
         stack: &Vec<Variable>,
-    ) -> Result<(PredicateLetter, Vec<Term>), Error> {
+    ) -> Result<(PredicateLetter, Vec<Term>), ParseError> {
         assert!(pair.as_rule() == Rule::simple_predicate);
 
         let mut inner = pair.clone().into_inner();
@@ -515,7 +515,7 @@ impl Parser {
             .collect::<Vec<Term>>();
 
         if predicate_letter.2 != terms.len() as u64 {
-            return Err(Error::new_from_custom_error(
+            return Err(ParseError::new_from_custom_error(
                 pair.as_span(),
                 "degree doesn't match number of terms specified",
             ));
@@ -525,7 +525,7 @@ impl Parser {
             Term::Variable(var) => stack.contains(var),
             _ => true,
         }) {
-            return Err(Error::new_from_custom_error(
+            return Err(ParseError::new_from_custom_error(
                 pair.as_span(),
                 "predicate binds to variable that isn't in scope",
             ));
@@ -558,7 +558,7 @@ mod tests {
     #[test]
     fn custom_error_provides_correct_location_info() {
         let e =
-            Error::new_from_custom_error(Span::new("Hello world!", 0, 4).unwrap(), "missing comma");
+            ParseError::new_from_custom_error(Span::new("Hello world!", 0, 4).unwrap(), "missing comma");
         assert!(e.location.0 == 1 && e.location.1 == 1);
     }
 

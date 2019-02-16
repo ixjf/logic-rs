@@ -8,18 +8,33 @@ use std::iter::{once, Chain, Once};
 #[cfg(feature = "serde_support")]
 use serde::ser::{Serialize, SerializeSeq, SerializeStruct, Serializer};
 
+/// Specifies a location to some node in the truth tree.
 #[derive(Clone, Debug)]
 pub struct BranchNodeLocation {
-    pub node_id: Id,
-    pub branch_id: Id,
+    pub node_id: TreeId,
+    pub branch_id: TreeId,
 }
 
+/// A statement of a branch, including information about where it was derived from.
 #[derive(Clone, Debug)]
 pub struct BranchNode {
+    /// The statement.
     pub statement: Statement,
+    /// If this statement was derived, contains a reference to the statement
+    /// that it was derived from and which rule was applied, along with the identifier
+    /// of the derivation.
     pub derived_from: Option<(BranchNodeLocation, Rule, DerivationId)>,
 }
 
+/// Identifies some derivation. A derivation is any application of some rule to some statement.
+/// 
+/// This ID is guaranteed to be unique for each different application of any rule. This ID
+/// is useful to analyse the truth tree and know which statements are part of the same derivation,
+/// since multiple statements may be derived from the same statement and rule, and yet not be
+/// the result of the _same_ application of a rule (e.g. the universal quantifier rule
+/// can be applied infinitely many times to the same statement).
+/// 
+/// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Clone, Debug)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct DerivationId {
@@ -30,23 +45,41 @@ pub struct DerivationId {
     // but they don't have the same derivation ID because they come from two different applications of a rule
     // On the other hand, deriving with the conditional rule leads to two statements, derived from the same statement,
     // and ALSO from the same application of the rule,
+
+    /// This field is a unique ID within this DerivationId. Two statements resulting from the same application of a rule
+    /// added to the same branch will have different values for this field, but those two statements on a sibling branch
+    /// will mirror the IDs from the previous branch. This is especially useful to construct a graphical representation
+    /// of the truth tree: in order to group statements from the same derivation by level, it is necessary
+    /// to actually know which statements match which. However, simply comparing the two statements is unreliable,
+    /// since sometimes two different statements from the same derivation, as is the case of the result of the application of a
+    /// conditional rule, _should_ be on the same line. If such a graphical representation is to not mix together
+    /// on the same line different statements (other than the case mentioned and alike), even if from the same derivation,
+    /// comparing against this field is required.
     pub index: u64, // Unique ID for identifying statements on the same 'line'
                     // e.g. if a statement results in two statements, each one of which starts a new branch (say, A IMPLIES B), then
                     // their index is the same. If, on the other hand, the statement results in two statements added to the same branch
                     // (say, A AND B), then each have a different index.
 }
 
+/// Identifies some branch node or some branch in a truth tree. This ID is guaranteed to be unique across any
+/// truth trees created.
+/// 
+/// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
-pub struct Id(NodeId); // Id is guaranteed to be unique to this process, and so can't clash with any branch ID either
+pub struct TreeId(NodeId); // Id is guaranteed to be unique to this process, and so can't clash with any branch ID either
 
+/// Represents a branch in a truth tree. It is composed
+/// of [BranchNode](struct.BranchNode.html)s.
+/// 
+/// The nodes of the branch are guaranteed to be in order of derivation.
 pub struct Branch {
     children: Tree<BranchNode>,
     closed: bool,
 }
 
 impl Branch {
-    pub fn new(trunk: Vec<BranchNode>) -> Self {
+    pub(in crate::validity) fn new(trunk: Vec<BranchNode>) -> Self {
         assert!(trunk.len() > 0);
 
         let mut tree = TreeBuilder::new().build();
@@ -68,7 +101,7 @@ impl Branch {
         }
     }
 
-    pub fn close(&mut self) {
+    pub(in crate::validity) fn close(&mut self) {
         self.closed = true;
     }
 
@@ -76,17 +109,19 @@ impl Branch {
         self.closed
     }
 
-    pub fn append_statement(&mut self, statement: BranchNode) -> Id {
+    pub(in crate::validity) fn append_statement(&mut self, statement: BranchNode) -> TreeId {
         assert!(!self.closed, "attempt to append statement to closed branch");
 
         let last_child_id = self.statement_ids().last().unwrap();
 
-        Id(self
-            .children
-            .insert(Node::new(statement), UnderNode(&last_child_id.0))
-            .unwrap())
+        TreeId(
+            self.children
+                .insert(Node::new(statement), UnderNode(&last_child_id.0))
+                .unwrap(),
+        )
     }
 
+    /// An Iterator over the IDs of this branch's nodes.
     pub fn statement_ids(&self) -> IdsIter<BranchNode> {
         IdsIter {
             tree: &self.children,
@@ -94,10 +129,13 @@ impl Branch {
         }
     }
 
-    pub fn statement_from_id(&self, id: &Id) -> &BranchNode {
+    /// Returns a reference to a specific node of this branch.
+    pub fn statement_from_id(&self, id: &TreeId) -> &BranchNode {
         self.children.get(&id.0).expect("invalid id").data()
     }
 
+    // FIXME: This doesn't need to be (TreeId, BranchNode). You can't and don't need to modify the node anyway!
+    /// An Iterator over the nodes of this branch.
     pub fn statements(&self) -> StatementsIter {
         StatementsIter {
             tree: &self.children,
@@ -108,6 +146,8 @@ impl Branch {
 
 // TODO: Can't StatementsIter be made more general, then have both this and IdsIter derive
 // from that same iterator?
+/// An Iterator over the nodes of a branch. It starts at the root and traverses it
+/// until the end of the branch (it does not iterate over children branches).
 #[derive(Clone)]
 pub struct StatementsIter<'a> {
     tree: &'a Tree<BranchNode>,
@@ -115,7 +155,7 @@ pub struct StatementsIter<'a> {
 }
 
 impl<'a> Iterator for StatementsIter<'a> {
-    type Item = (Id, &'a BranchNode);
+    type Item = (TreeId, &'a BranchNode);
 
     fn next(&mut self) -> Option<Self::Item> {
         // self.stack.push(root_item);
@@ -135,10 +175,13 @@ impl<'a> Iterator for StatementsIter<'a> {
         // We can clone IDs only because branches/statement trees do not allow
         // removing any nodes, hence there will never
         // be references to non-existing nodes
-        Some((Id(id.clone()), self.tree.get(id).unwrap().data()))
+        Some((TreeId(id.clone()), self.tree.get(id).unwrap().data()))
     }
 }
 
+/// An Iterator over the IDs of either branches or statements. It implements
+/// a pre-order traversal algorithm. If it is an iterator over the IDs of
+/// nodes, it guarantees to traverse them from the root to the end of the branch.
 #[derive(Clone)]
 pub struct IdsIter<'a, T> {
     tree: &'a Tree<T>,
@@ -146,7 +189,7 @@ pub struct IdsIter<'a, T> {
 }
 
 impl<'a, T> Iterator for IdsIter<'a, T> {
-    type Item = Id;
+    type Item = TreeId;
 
     fn next(&mut self) -> Option<Self::Item> {
         // self.stack.push(root_item);
@@ -166,68 +209,79 @@ impl<'a, T> Iterator for IdsIter<'a, T> {
         // We can clone IDs only because branches/statement trees do not allow
         // removing any nodes, hence there will never
         // be references to non-existing nodes
-        Some(Id(id.clone()))
+        Some(TreeId(id.clone()))
     }
 }
 
 // FIXME Why can't I derive Clone here?
+/// An Iterator over a branch's ancestors' IDs. It includes the origin branch as well.
 pub struct UpwardsBranchIdsIter<'a> {
     iter: Chain<Once<&'a NodeId>, AncestorIds<'a, Branch>>,
 }
 
 impl<'a> Iterator for UpwardsBranchIdsIter<'a> {
-    type Item = Id;
+    type Item = TreeId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|x| Id(x.clone()))
+        self.iter.next().map(|x| TreeId(x.clone()))
     }
 }
 
+// FIXME Are both of these iterators needed?
 // FIXME Why can't I derive Clone here?
+/// An Iterator over a branch's ancestors. It includes the origin branch as well.
 pub struct UpwardsBranchesIter<'a> {
     iter: Chain<Once<&'a NodeId>, AncestorIds<'a, Branch>>,
     tree: &'a Tree<Branch>,
 }
 
 impl<'a> Iterator for UpwardsBranchesIter<'a> {
-    type Item = (Id, &'a Branch);
+    type Item = (TreeId, &'a Branch);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(|x| (Id(x.clone()), self.tree.get(&x).unwrap().data()))
+            .map(|x| (TreeId(x.clone()), self.tree.get(&x).unwrap().data()))
     }
 }
 
+/// An Iterator over the direct descendants of a branch.
 #[derive(Clone)]
 pub struct BranchImmediateChildrenIdsIter<'a> {
     iter: ChildrenIds<'a>,
 }
 
 impl<'a> Iterator for BranchImmediateChildrenIdsIter<'a> {
-    type Item = Id;
+    type Item = TreeId;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|x| Id(x.clone()))
+        self.iter.next().map(|x| TreeId(x.clone()))
     }
 }
 
+/// Represents a truth tree generated by the truth tree algorithm.
 pub struct TruthTree {
     tree: Tree<Branch>,
 }
 
 impl<'a> TruthTree {
-    pub fn new(main_branch: Branch) -> Self {
+    pub(in crate::validity) fn new(main_branch: Branch) -> Self {
         TruthTree {
             tree: TreeBuilder::new().with_root(Node::new(main_branch)).build(),
         }
     }
 
-    pub fn main_trunk_id(&self) -> Id {
-        Id(self.tree.root_node_id().unwrap().clone())
+    /// Returns the ID of the root branch of the tree.
+    pub fn main_trunk_id(&self) -> TreeId {
+        TreeId(self.tree.root_node_id().unwrap().clone())
     }
 
-    pub fn traverse_upwards_branch_ids(&'a self, branch_id: &'a Id) -> UpwardsBranchIdsIter<'a> {
+    /// Returns an Iterator over some branch's ancestors' IDs. Includes the origin branch
+    /// as well.
+    pub fn traverse_upwards_branch_ids(
+        &'a self,
+        branch_id: &'a TreeId,
+    ) -> UpwardsBranchIdsIter<'a> {
         UpwardsBranchIdsIter {
             iter: once(&branch_id.0).chain(
                 self.tree
@@ -237,7 +291,9 @@ impl<'a> TruthTree {
         }
     }
 
-    pub fn traverse_upwards_branches(&'a self, branch_id: &'a Id) -> UpwardsBranchesIter<'a> {
+    /// Returns an Iterator over some branch's ancestors. Includes the origin branch
+    /// as well.
+    pub fn traverse_upwards_branches(&'a self, branch_id: &'a TreeId) -> UpwardsBranchesIter<'a> {
         UpwardsBranchesIter {
             iter: once(&branch_id.0).chain(
                 self.tree
@@ -248,23 +304,27 @@ impl<'a> TruthTree {
         }
     }
 
-    pub fn traverse_downwards_branch_ids(&'a self, branch_id: &'a Id) -> IdsIter<Branch> {
+    /// Returns an Iterator over all branches starting at `branch_id` (including it) using a pre-order
+    /// traversal algorithm.
+    pub fn traverse_downwards_branch_ids(&'a self, branch_id: &'a TreeId) -> IdsIter<Branch> {
         IdsIter {
             tree: &self.tree,
             stack: vec![&branch_id.0],
         }
     }
 
+    /// Returns an Iterator over some branch's direct descendants.
     pub fn traverse_branch_immediate_children_ids(
         &'a self,
-        branch_id: &'a Id,
+        branch_id: &'a TreeId,
     ) -> BranchImmediateChildrenIdsIter<'a> {
         BranchImmediateChildrenIdsIter {
             iter: self.tree.children_ids(&branch_id.0).unwrap(),
         }
     }
 
-    pub fn branch_is_last_child(&'a self, branch_id: &'a Id) -> bool {
+    /// Returns true if the branch has no children, false if it does.
+    pub fn branch_is_last_child(&'a self, branch_id: &'a TreeId) -> bool {
         self.tree
             .get(&branch_id.0)
             .expect("invalid branch_id")
@@ -272,32 +332,39 @@ impl<'a> TruthTree {
             .is_empty()
     }
 
-    pub fn branch_from_id_mut(&mut self, branch_id: &Id) -> &mut Branch {
+    pub(in crate::validity) fn branch_from_id_mut(&mut self, branch_id: &TreeId) -> &mut Branch {
         self.tree
             .get_mut(&branch_id.0)
             .expect("invalid branch_id")
             .data_mut()
     }
 
-    pub fn branch_from_id(&self, branch_id: &Id) -> &Branch {
+    /// Returns a reference to the `Branch` specified by `branch_id`.
+    pub fn branch_from_id(&self, branch_id: &TreeId) -> &Branch {
         self.tree
             .get(&branch_id.0)
             .expect("invalid branch_id")
             .data()
     }
 
-    pub fn append_branch_at(&mut self, branch: Branch, as_child_of_branch_id: &Id) -> Id {
+    pub(in crate::validity) fn append_branch_at(
+        &mut self,
+        branch: Branch,
+        as_child_of_branch_id: &TreeId,
+    ) -> TreeId {
         assert!(
             !self.branch_from_id(&as_child_of_branch_id).is_closed(),
             "attempt to add child to closed branch"
         );
 
-        Id(self
-            .tree
-            .insert(Node::new(branch), UnderNode(&as_child_of_branch_id.0))
-            .expect("invalid branch_id"))
+        TreeId(
+            self.tree
+                .insert(Node::new(branch), UnderNode(&as_child_of_branch_id.0))
+                .expect("invalid branch_id"),
+        )
     }
 
+    /// Returns true if there is at least one open branch in the entire tree, false if not.
     pub fn is_open(&self) -> bool {
         self.traverse_downwards_branch_ids(&self.main_trunk_id())
             .filter(|x| self.branch_is_last_child(&x) && !self.branch_from_id(&x).is_closed())
@@ -308,11 +375,18 @@ impl<'a> TruthTree {
 
 #[cfg(feature = "serde_support")]
 impl Serialize for TruthTree {
+    /// Serializes the truth tree. Output has the following format:
+    /// https://gist.github.com/ixjf/dd4ef260a05a46d2ec94873a53728599
+    /// 
+    /// The serialized output is guaranteed to maintain the order of the nodes
+    /// relative to order of derivation.
+    ///
+    /// **Serialization requires the feature `serde_support` to be enabled.**
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        struct BranchSer<'a>(&'a Id, &'a TruthTree);
+        struct BranchSer<'a>(&'a TreeId, &'a TruthTree);
 
         impl<'a> Serialize for BranchSer<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -347,7 +421,7 @@ impl Serialize for TruthTree {
             }
         }
 
-        struct BranchNodeSer<'a>(&'a Id, &'a BranchNode);
+        struct BranchNodeSer<'a>(&'a TreeId, &'a BranchNode);
 
         impl<'a> Serialize for BranchNodeSer<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -383,7 +457,7 @@ impl Serialize for TruthTree {
             }
         }
 
-        struct BranchChildrenSer<'a>(&'a Id, &'a TruthTree);
+        struct BranchChildrenSer<'a>(&'a TreeId, &'a TruthTree);
 
         impl<'a> Serialize for BranchChildrenSer<'a> {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -436,9 +510,9 @@ mod tests {
             stack: vec![&root_id],
         };
 
-        assert_eq!(iter.next(), Some(Id(root_id.clone())));
-        assert_eq!(iter.next(), Some(Id(child_1_id)));
-        assert_eq!(iter.next(), Some(Id(child_2_id)));
+        assert_eq!(iter.next(), Some(TreeId(root_id.clone())));
+        assert_eq!(iter.next(), Some(TreeId(child_1_id)));
+        assert_eq!(iter.next(), Some(TreeId(child_2_id)));
         assert_eq!(iter.next(), None);
     }
 
@@ -461,8 +535,8 @@ mod tests {
             iter: once(&child_1_id).chain(tree.ancestor_ids(&child_1_id).unwrap()),
         };
 
-        assert_eq!(iter.next(), Some(Id(child_1_id.clone())));
-        assert_eq!(iter.next(), Some(Id(root_id.clone())));
+        assert_eq!(iter.next(), Some(TreeId(child_1_id.clone())));
+        assert_eq!(iter.next(), Some(TreeId(root_id.clone())));
         assert_eq!(iter.next(), None);
     }
 
@@ -591,7 +665,7 @@ mod tests {
 
         assert_eq!(
             root_id,
-            Id(statement_tree.tree.root_node_id().unwrap().clone())
+            TreeId(statement_tree.tree.root_node_id().unwrap().clone())
         );
     }
 
@@ -606,7 +680,7 @@ mod tests {
 
         let mut iter = statement_tree.traverse_upwards_branch_ids(&child_branch_1_id);
 
-        assert_eq!(iter.next(), Some(Id(child_branch_1_id.0.clone())));
+        assert_eq!(iter.next(), Some(TreeId(child_branch_1_id.0.clone())));
         assert_eq!(iter.next(), Some(statement_tree.main_trunk_id()));
         assert_eq!(iter.next(), None);
     }
@@ -757,8 +831,8 @@ mod tests {
 
         let mut iter = statement_tree.traverse_downwards_branch_ids(&root_id);
 
-        assert_eq!(iter.next(), Some(Id(root_id.0.clone())));
-        assert_eq!(iter.next(), Some(Id(child_branch_1_id.0.clone())));
+        assert_eq!(iter.next(), Some(TreeId(root_id.0.clone())));
+        assert_eq!(iter.next(), Some(TreeId(child_branch_1_id.0.clone())));
         assert_eq!(iter.next(), None);
     }
 

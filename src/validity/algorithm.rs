@@ -5,6 +5,9 @@ use std::cmp::Ordering;
 use std::collections::BinaryHeap;
 use std::iter::once;
 
+/// A rule of the truth tree algorithm.
+/// 
+/// **Serialization of this enum requires the feature `serde_support` to be enabled.**
 #[derive(Clone, PartialEq, Eq, Debug)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub enum Rule {
@@ -22,10 +25,10 @@ pub enum Rule {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 struct QueueEntry {
-    statement_id: Id,
+    statement_id: TreeId,
     statement: Statement,
     rule: Option<(Rule, bool)>,
-    branch_id: Id,
+    branch_id: TreeId,
     failed_last: bool, // Indicates whether the rule was applied successfully the last time
                        // Useful for recursive rules where we need to avoid infinite loops if no rule in the queue
                        // can be applied any longer. (e.g. UQ - it can never be removed from the queue
@@ -370,7 +373,7 @@ impl TruthTreeMethod {
         self.tree
     }
 
-    fn statement_is_contradiction(&self, statement: &Statement, branch_id: &Id) -> bool {
+    fn statement_is_contradiction(&self, statement: &Statement, branch_id: &TreeId) -> bool {
         // Usually, you'd think to only iterate towards the root of the tree
         // to find a contradiction, however, it's easier if we accept the entire
         // branch the statement is on. After all, if there is a contradiction
@@ -514,7 +517,7 @@ impl TruthTreeMethod {
         &self,
         rule: Rule,
         statement: &Statement,
-        branch_id: &Id,
+        branch_id: &TreeId,
     ) -> Option<RuleDeriveResult> {
         match rule {
             Rule::QuantifierExchange => self.apply_qe_rule(&statement),
@@ -553,7 +556,7 @@ impl TruthTreeMethod {
         }
     }
 
-    fn apply_eq_rule(&self, statement: &Statement, branch_id: &Id) -> Option<RuleDeriveResult> {
+    fn apply_eq_rule(&self, statement: &Statement, branch_id: &TreeId) -> Option<RuleDeriveResult> {
         match statement {
             Statement::Existential(_, _) => Some(RuleDeriveResult {
                 statements: vec![self.instantiate_quantified_statement(
@@ -568,7 +571,7 @@ impl TruthTreeMethod {
         }
     }
 
-    fn apply_uq_rule(&self, statement: &Statement, branch_id: &Id) -> Option<RuleDeriveResult> {
+    fn apply_uq_rule(&self, statement: &Statement, branch_id: &TreeId) -> Option<RuleDeriveResult> {
         match statement {
             Statement::Universal(_, _) => {
                 // Find some singular term which we haven't instantiated this universal
@@ -712,7 +715,7 @@ impl TruthTreeMethod {
         }
     }
 
-    fn build_singular_term_stack_for_branch(&self, branch_id: &Id) -> Vec<SingularTerm> {
+    fn build_singular_term_stack_for_branch(&self, branch_id: &TreeId) -> Vec<SingularTerm> {
         let mut stack = Vec::new();
 
         for ancestor_branch_id in self.tree.traverse_upwards_branch_ids(&branch_id) {

@@ -9,4 +9,4 @@ pub use ast::{
 
 pub use parser::Parser;
 
-pub use error::Error;
+pub use error::ParseError;

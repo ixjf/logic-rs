@@ -1,31 +1,42 @@
 use super::parser::Rule;
-use pest::error::Error as pest_error;
-use pest::error::ErrorVariant as pest_error_variant;
+use pest::error::Error as PestError;
+use pest::error::ErrorVariant as PestErrorVariant;
 use pest::Span;
 use std::fmt;
+use std::error::Error;
 
-pub struct Error {
+/// Represents an error during parsing of the input, be it a syntax error
+/// or a semantical error.
+/// 
+/// In addition to line and column, it provides a formatted message
+/// underlining exactly where the error occurred and which error
+/// it is.
+#[derive(Debug)]
+pub struct ParseError {
+    /// (line, column)
     pub location: (usize, usize),
     decorated_message: String,
 }
 
-impl Error {
+impl Error for ParseError {}
+
+impl ParseError {
     pub(in crate::parser) fn new_from_custom_error(span: Span, decorated_message: &str) -> Self {
-        let e: pest_error<Rule> = pest_error::new_from_span(
-            pest_error_variant::CustomError {
+        let e: PestError<Rule> = PestError::new_from_span(
+            PestErrorVariant::CustomError {
                 message: decorated_message.to_owned(),
             },
             span.clone(),
         )
-        .renamed_rules(Error::renamed_rules);
+        .renamed_rules(ParseError::renamed_rules);
 
-        Error {
+        ParseError {
             location: span.start_pos().line_col(),
             decorated_message: format!("{}", e),
         }
     }
 
-    pub(in crate::parser) fn new_from_parsing_error(e: pest_error<Rule>) -> Error {
+    pub(in crate::parser) fn new_from_parsing_error(e: PestError<Rule>) -> ParseError {
         use pest::error::LineColLocation;
 
         let location = match e.line_col {
@@ -33,9 +44,9 @@ impl Error {
             _ => unreachable!(), // is this actually unreachable? it's not documented
         };
 
-        Error {
+        ParseError {
             location,
-            decorated_message: format!("{}", e.renamed_rules(Error::renamed_rules)),
+            decorated_message: format!("{}", e.renamed_rules(ParseError::renamed_rules)),
         }
     }
 
@@ -93,7 +104,7 @@ impl Error {
     }
 }
 
-impl fmt::Display for Error {
+impl fmt::Display for ParseError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.decorated_message)
     }

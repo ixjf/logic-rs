@@ -1,3 +1,6 @@
+/// 
+/// 
+/// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct Subscript(pub Option<u64>);
@@ -11,18 +14,30 @@ impl PartialEq<u64> for Subscript {
     }
 }
 
+/// 
+/// 
+/// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct SimpleStatementLetter(pub char, pub Subscript);
 
+/// 
+/// 
+/// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct SingularTerm(pub char, pub Subscript);
 
+/// 
+/// 
+/// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct Variable(pub char, pub Subscript);
 
+/// 
+/// 
+/// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct Degree(pub u64);
@@ -33,20 +48,16 @@ impl PartialEq<u64> for Degree {
     }
 }
 
+/// 
+/// 
+/// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct PredicateLetter(pub char, pub Subscript, pub Degree);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Input {
-    StatementSet(Vec<Statement>),
-    Argument(Vec<Statement>, Statement),
-    Statement(Statement),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParseTree(pub Input);
-
+/// 
+/// 
+/// **Serialization of this enum requires the feature `serde_support` to be enabled.**
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub enum Term {
@@ -54,6 +65,9 @@ pub enum Term {
     Variable(Variable),
 }
 
+/// 
+/// 
+/// **Serialization of this enum requires the feature `serde_support` to be enabled.**
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub enum Statement {
@@ -67,6 +81,9 @@ pub enum Statement {
     Universal(Variable, Box<Formula>),
 }
 
+/// 
+/// 
+/// **Serialization of this enum requires the feature `serde_support` to be enabled.**
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub enum Formula {
@@ -77,3 +94,13 @@ pub enum Formula {
     Disjunction(Box<Formula>, Box<Formula>),
     Conditional(Box<Formula>, Box<Formula>),
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Input {
+    StatementSet(Vec<Statement>),
+    Argument(Vec<Statement>, Statement),
+    Statement(Statement),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParseTree(pub Input);
