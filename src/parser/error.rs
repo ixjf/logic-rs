@@ -5,7 +5,7 @@ use pest::Span;
 use std::fmt;
 use std::error::Error;
 
-/// Represents an error during parsing of the input, be it a syntax error
+/// An error that may occur during parsing of the input, be it a syntax error
 /// or a semantical error.
 /// 
 /// In addition to line and column, it provides a formatted message

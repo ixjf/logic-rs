@@ -1,21 +1,24 @@
 #![doc(html_root_url = "https://docs.rs/logic_rs/0.1.0")]
 
-//! # Overview
-//! logic_rs is a parser of relational predicate logic (better known as 'first-order logic') 
-//! and truth tree solver. It is heavily influenced by the book _Meaning and Argument: 
+//! A parser of relational predicate logic (better known as 'first-order logic')
+//! and truth tree solver.
+//!
+//! logic_rs is heavily influenced by the book _Meaning and Argument:
 //! An Introduction to Logic Through Language_, by Ernest Lepore and Sam Cumming, trying
 //! to follow as closely as possible its grammar and rules.
-//! 
-//! It uses separate syntax for statement sets ('{' <statements..> '}'), arguments
-//! (<statements..> '∴' < statement >), and sole statements (< statement >), and so
+//!
+//! It uses separate syntax for statement sets, arguments, and sole statements, and so
 //! can automatically generate and analyse truth trees accordingly.
-//! 
+//!
 //! The website for this library, which can be found [here](https://ixjf.github.io/logic-rs/),
 //! provides a full-featured demo of it.
-//! 
+//!
+//! **Note: logic_rs currently doesn't support identity statements. It is planned
+//! for the future, however.**
+//!
 //! # Usage
 //! Validating some formula is as simple as:
-//! 
+//!
 //! ```
 //! # use std::error::Error;
 //! # use logic_rs::parse_input;
@@ -32,10 +35,10 @@
 //! #     Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! And proving that the input above is a sole statement and that that statement is a contingency
 //! is just as simple:
-//! 
+//!
 //! ```
 //! # use std::error::Error;
 //! # use logic_rs::{parse_input, InputKind};
@@ -45,7 +48,7 @@
 //!         InputKind::Statement(st) => {
 //!             let (
 //!                 is_contingency,
-//!                 truth_tree_statement, 
+//!                 truth_tree_statement,
 //!                 truth_tree_negation_of_stmt
 //!                 ) = st.is_contingency();
 //!             
@@ -59,27 +62,38 @@
 //! #     Ok(())
 //! # }
 //! ```
-//! 
+//!
 //! Essentially, the flow is always:
 //!  - Call [parse_input](fn.parse_input.html)
-//!  - Match on the result of the call to know the kind of the input (statement set, argument, single statement)
-//!  - Call one of the is_* methods of the input kind to run the truth tree algorithm
-//!  - Do something with the truth tree or the analysis of it
-//! 
+//!  - Handle potential [ParseError](struct.ParseError.html)s
+//!  - Match on the `Ok` value
+//!  - Call one or more of the is_* methods of the [StatementSet](struct.StatementSet.html), [Argument](struct.Argument.html),
+//! or [SingleStatement](struct.SingleStatement.html) to run the truth tree algorithm
+//!  - Do something with the truth tree(s) or the analysis of it
+//!
 //! # Language and Truth Tree Algorithm
 //! A specification of the language can be found [here](https://github.com/ixjf/logic-rs/wiki/Language).
-//! 
+//!
 //! Note that because the language as specified allows an infinite number of different
 //! constants, the truth tree algorithm **will** get stuck if the set of initial statements
-//! lead to an infinite tree. There are ways around this, but they involve either limiting
-//! the universe of discourse and still generating needlessly huge truth trees, or
-//! allowing one to stop the moment one branch is finished and open, which is still unreliable
-//! and leads to half-done trees.
-//! 
+//! lead to an infinite tree. There are ways around this, like limiting
+//! the universe of discourse, which still generates needlessly huge truth trees, or
+//! allowing one to stop the moment one branch is finished and open, which limits the amount of
+//! possible input sets that lead to infinite trees, but which doesn't fully get rid of them,
+//! and which leads to half-done trees.
+//!
 //! It is obviously not intended that this stay this way - no library should do such a thing.
-//! However, either way it goes, because predicate logic **is** undecidable, any change
-//! will always be a workaround and will always be unreliable.
-//! 
+//! However, because predicate logic **is** undecidable, any change
+//! will either be a workaround and be unreliable, in the sense that it doesn't fully resolve
+//! the issue, or it will limit the number of allowed input sets. Either way it goes, hopefully
+//! there is some solution that can follow these three rules:
+//! 1) it cannot generate needlessly huge trees,
+//! 2) it cannot change the set of all input sets that are unsatisfiable
+//! and that can be classified by the library,
+//! 3) it cannot break the correctness of the classification of the allowed input sets.
+//!
+//! Unfortunately, there is probably no solution that satisfies more than 1) and 3).
+//!
 //! One thing can be guaranteed, though, and that is that, _unless there is a bug_, the algorithm
 //! will **always** correctly classify an unsatisfiable set of statements, which also implies that
 //! if it does get stuck in an infinite loop, then the initial set of statements is satisfiable.
@@ -109,12 +123,14 @@ pub use parser::{
     Term, Variable,
 };
 pub use validity::{
-    Branch, BranchImmediateChildrenIdsIter, BranchNode, BranchNodeLocation, DerivationId, IdsIter,
-    Rule, StatementsIter, TreeId, TruthTree, UpwardsBranchIdsIter, UpwardsBranchesIter,
+    Branch, BranchDirectDescendantsIdsIter, BranchDirectDescendantsIter, BranchNode,
+    BranchNodeLocation, DerivationId, DownwardsBranchesIdsIter, DownwardsBranchesIter, Rule,
+    StatementIdsIter, StatementsIter, TreeId, TruthTree, UpwardsBranchesIdsIter,
+    UpwardsBranchesIter,
 };
 
-/// Represents the statement set parsed from the input, through which one can
-/// check its consistency.
+/// A statement set parsed from the input, through which one can check its
+/// consistency.
 pub struct StatementSet {
     statements: Vec<Statement>,
 }
@@ -122,15 +138,15 @@ pub struct StatementSet {
 impl StatementSet {
     /// Returns as the first field of the tuple a boolean representing whether
     /// the statement set is consistent, and the proof truth tree as the second.
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// # use std::error::Error;
     /// # use logic_rs::{parse_input, InputKind};
     /// # fn main() -> Result<(), Box<Error>> {
     /// let parsed_input = parse_input("{(A & B)}")?;
-    /// 
+    ///
     /// match parsed_input {
     ///     InputKind::StatementSet(st_set) => {
     ///         let (is_consistent, truth_tree) = st_set.is_consistent();
@@ -142,7 +158,7 @@ impl StatementSet {
     /// #     Ok(())
     /// # }
     /// ```
-    /// 
+    ///
     pub fn is_consistent(&self) -> (bool, TruthTree) {
         let truth_tree = TruthTreeMethod::new(&self.statements).compute();
 
@@ -153,8 +169,7 @@ impl StatementSet {
     }
 }
 
-/// Represents the argument parsed from the input, through which one can
-/// check its formal validity.
+/// An argument parsed from the input, through which one can check its formal validity.
 pub struct Argument {
     premises: Vec<Statement>,
     conclusion: Statement,
@@ -165,13 +180,13 @@ impl Argument {
     /// the argument is formally valid, and the proof truth tree as the second.
     ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// # use std::error::Error;
     /// # use logic_rs::{parse_input, InputKind};
     /// # fn main() -> Result<(), Box<Error>> {
     /// let parsed_input = parse_input("A ∴ B")?;
-    /// 
+    ///
     /// match parsed_input {
     ///     InputKind::Argument(arg) => {
     ///         let (is_valid, truth_tree) = arg.is_valid();
@@ -183,7 +198,7 @@ impl Argument {
     /// #     Ok(())
     /// # }
     /// ```
-    /// 
+    ///
     pub fn is_valid(&self) -> (bool, TruthTree) {
         // Transform into statement list of form '<premise>, <premise>,...,negation of <conclusion>'
         let mut statements = self.premises.clone();
@@ -199,9 +214,9 @@ impl Argument {
     }
 }
 
-/// Represents the one statement parsed from the input, through which one can
-/// check its logical properties, such as whether it is a contradiction,
-/// tautology, or contingency.
+/// A single statement parsed from the input, through which one can check its
+/// logical properties, such as whether it is a contradiction, tautology, or
+/// contingency.
 pub struct SingleStatement {
     statement: Statement,
 }
@@ -211,13 +226,13 @@ impl SingleStatement {
     /// the statement is a contradiction, and the proof truth tree as the second.
     ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// # use std::error::Error;
     /// # use logic_rs::{parse_input, InputKind};
     /// # fn main() -> Result<(), Box<Error>> {
     /// let parsed_input = parse_input("(A & ~A)")?;
-    /// 
+    ///
     /// match parsed_input {
     ///     InputKind::Statement(st) => {
     ///         let (is_contradiction, truth_tree) = st.is_contradiction();
@@ -229,7 +244,7 @@ impl SingleStatement {
     /// #     Ok(())
     /// # }
     /// ```
-    /// 
+    ///
     pub fn is_contradiction(&self) -> (bool, TruthTree) {
         let truth_tree = TruthTreeMethod::new(&vec![self.statement.clone()]).compute();
 
@@ -243,13 +258,13 @@ impl SingleStatement {
     /// the statement is a tautology, and the proof truth tree as the second.
     ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// # use std::error::Error;
     /// # use logic_rs::{parse_input, InputKind};
     /// # fn main() -> Result<(), Box<Error>> {
     /// let parsed_input = parse_input("(A ∨ ~A)")?;
-    /// 
+    ///
     /// match parsed_input {
     ///     InputKind::Statement(st) => {
     ///         let (is_tautology, truth_tree) = st.is_tautology();
@@ -261,7 +276,7 @@ impl SingleStatement {
     /// #     Ok(())
     /// # }
     /// ```
-    /// 
+    ///
     pub fn is_tautology(&self) -> (bool, TruthTree) {
         // A statement is a tautology if its negation is a contradiction
         // So we negate self.statement and do the same thing as in
@@ -279,13 +294,13 @@ impl SingleStatement {
     /// a tautology.
     ///
     /// # Examples
-    /// 
+    ///
     /// ```
     /// # use std::error::Error;
     /// # use logic_rs::{parse_input, InputKind};
     /// # fn main() -> Result<(), Box<Error>> {
     /// let parsed_input = parse_input("A")?;
-    /// 
+    ///
     /// match parsed_input {
     ///     InputKind::Statement(st) => {
     ///         let (
@@ -301,7 +316,7 @@ impl SingleStatement {
     /// #    Ok(())
     /// # }
     /// ```
-    /// 
+    ///
     pub fn is_contingency(&self) -> (bool, TruthTree, TruthTree) {
         // A statement is a contingency if it's neither a contradiction
         // nor a tautology
@@ -316,7 +331,7 @@ impl SingleStatement {
     }
 }
 
-/// Represents the parsed input.
+/// The parsed input.
 pub enum InputKind {
     StatementSet(StatementSet),
     Argument(Argument),
@@ -324,9 +339,9 @@ pub enum InputKind {
 }
 
 /// Parses some statement set, argument, or statement. Takes in input
-/// as a string following the specification from 
+/// as a string following the specification from
 /// [here](https://github.com/ixjf/logic-rs/wiki/Language).
-/// 
+///
 /// Fails if the input is syntatically or semantically invalid.
 pub fn parse_input(input: &str) -> Result<InputKind, ParseError> {
     let parser = Parser::new();

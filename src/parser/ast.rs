@@ -1,4 +1,5 @@
-/// 
+/// An optional positive integer that is part of the identifier for a simple
+/// statement letter, simple predicate letter, or term.
 /// 
 /// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -14,28 +15,29 @@ impl PartialEq<u64> for Subscript {
     }
 }
 
-/// 
+/// The identifier of a simple statement.
 /// 
 /// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct SimpleStatementLetter(pub char, pub Subscript);
 
-/// 
+/// The identifier of a singular term.
 /// 
 /// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct SingularTerm(pub char, pub Subscript);
 
-/// 
+/// The identifier of a variable.
 /// 
 /// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct Variable(pub char, pub Subscript);
 
-/// 
+/// A positive integer that denotes the degree (the arity or number of terms
+/// attached) of a simple predicate.
 /// 
 /// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -48,14 +50,14 @@ impl PartialEq<u64> for Degree {
     }
 }
 
-/// 
+/// The identifier of a simple predicate.
 /// 
 /// **Serialization of this struct requires the feature `serde_support` to be enabled.**
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde_support", derive(Serialize))]
 pub struct PredicateLetter(pub char, pub Subscript, pub Degree);
 
-/// 
+/// A term.
 /// 
 /// **Serialization of this enum requires the feature `serde_support` to be enabled.**
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,7 +67,7 @@ pub enum Term {
     Variable(Variable),
 }
 
-/// 
+/// A statement.
 /// 
 /// **Serialization of this enum requires the feature `serde_support` to be enabled.**
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,7 +83,7 @@ pub enum Statement {
     Universal(Variable, Box<Formula>),
 }
 
-/// 
+/// A formula. It can be any statement, predicate, or a compound formula made of either of these.
 /// 
 /// **Serialization of this enum requires the feature `serde_support` to be enabled.**
 #[derive(Debug, Clone, PartialEq, Eq)]
