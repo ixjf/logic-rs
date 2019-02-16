@@ -17,7 +17,7 @@
   "license": "MIT",
   "devDependencies": {
     "copy-webpack-plugin": "^4.5.2",
-    "webpack": "^4.29.3",
+    "webpack": "^4.29.4",
     "webpack-cli": "^3.2.3",
     "webpack-dev-server": "^3.1.5"
   },
@@ -31,6 +31,7 @@
     "jquery": "^3.3.1",
     "popper.js": "^1.14.7",
     "style-loader": "^0.23.1",
+    "text-encoding": "^0.7.0",
     "vis": "^4.21.0"
   }
 }

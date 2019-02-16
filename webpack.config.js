@@ -13,7 +13,7 @@ module.exports = {
       [
         'index.html',
       ]
-    )
+    ),
   ],
   module: {
     rules: [

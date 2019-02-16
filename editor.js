@@ -28,7 +28,7 @@ export function loadEditor() {
         document.querySelectorAll('.ui.button.editor-toolbar-shortcut').forEach(e => {
             // Not all toolbar buttons have a keymap
             var keyMap = Object.entries(keysMap).find(v => {
-                return v[1] == e.innerText;
+                return e.innerText.includes(v[1]);
             });
 
             if (keyMap) {
