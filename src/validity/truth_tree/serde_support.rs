@@ -29,7 +29,7 @@ impl<'a> Serialize for BranchNodesSer<'a> {
         S: Serializer,
     {
         let mut seq = serializer.serialize_seq(None)?;
-        for (statement_id, branch_node) in self.0 {
+        for (statement_id, branch_node) in self.0.clone() {
             seq.serialize_element(&BranchNodeSer(&statement_id, &branch_node))?;
         }
         seq.end()
