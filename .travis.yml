@@ -29,7 +29,7 @@ before_script:
   - export PATH=$PATH:~/.cargo/bin
 
 script:
-  - cargo test --verbose
+  - cargo test --verbose --features serde_support
   - |
       if [[ "$TRAVIS_RUST_VERSION" == "nightly" && $CLIPPY ]]; then
         cargo clippy
