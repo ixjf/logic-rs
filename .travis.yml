@@ -10,7 +10,8 @@ matrix:
     - rust: nightly
   fast_finish: true
 branches:
-  - master
+  only:
+    - master
 
 addons:
   apt:
