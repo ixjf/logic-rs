@@ -11,7 +11,7 @@ to follow as closely as possible its grammar and rules.
 It uses separate syntax for statement sets, arguments, and sole statements, and so
 can automatically generate and analyse truth trees accordingly.
 
-The library powers the website, which you can find [here](https://ixjf.github.io/logic-rs/),
+The library powers its website, which you can find [here](https://ixjf.github.io/logic-rs/),
 serving only that purpose, but it is not tied to it at all, and can be used
 completely independently.
 
