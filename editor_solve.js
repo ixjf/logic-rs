@@ -1,95 +1,101 @@
-import * as logic_wasm from "wasm-layer";
 import TruthTree from './truth_tree.js';
 
 export function solve(input) {
-    var parsedInput = null;
+    // Hopefully this is only loaded once?
+    import("wasm-layer")
+        .catch(e => console.log("Wasm module failed to load: ", e))
+        .then(wasm_module => {
+            console.log("Wasm module loaded.");
 
-    try {
-        parsedInput = logic_wasm.parse_input(input);
-    }
-    catch (e) {
-        _showParseError(e);
-        return;
-    }
+            var parsedInput = null;
 
-    _hideAnyParseError();
+            try {
+                parsedInput = wasm_module.parse_input(input);
+            }
+            catch (e) {
+                _showParseError(e);
+                return;
+            }
 
-    if (parsedInput.get_kind() == logic_wasm.InputKind.StatementSet) {
-        var isConsistent = parsedInput.is_consistent();
+            _hideAnyParseError();
 
-        document.getElementById('output-tab-container').innerHTML = _computeHtmlOutput({
-            message: `Statement set is${isConsistent.is_consistent ? ' ' : ' not '}consistent.`,
-            trees: [
-                {
-                    id: 'truth-tree',
+            if (parsedInput.get_kind() == wasm_module.InputKind.StatementSet) {
+                var isConsistent = parsedInput.is_consistent();
+
+                document.getElementById('output-tab-container').innerHTML = _computeHtmlOutput({
+                    message: `Statement set is${isConsistent.is_consistent ? ' ' : ' not '}consistent.`,
+                    trees: [
+                        {
+                            id: 'truth-tree',
+                        }
+                    ]
+                });
+
+                new TruthTree(
+                    document.getElementById('truth-tree'),
+                    isConsistent.truth_tree
+                );
+            }
+            else if (parsedInput.get_kind() == wasm_module.InputKind.Argument) {
+                var isValid = parsedInput.is_valid();
+
+                document.getElementById('output-tab-container').innerHTML = _computeHtmlOutput({
+                    message: `Argument is${isValid.is_valid ? ' ' : ' not '}valid.`,
+                    trees: [
+                        {
+                            id: 'truth-tree',
+                        }
+                    ]
+                });
+
+                new TruthTree(
+                    document.getElementById('truth-tree'),
+                    isValid.truth_tree
+                );
+            }
+            else if (parsedInput.get_kind() == wasm_module.InputKind.Statement) {
+                var isContradiction = parsedInput.is_contradiction();
+                var isTautology = parsedInput.is_tautology();
+
+                var isWhat = null;
+
+                if (isContradiction.is_contradiction) {
+                    isWhat = 'contradiction';
                 }
-            ]
-        });
-
-        new TruthTree(
-            document.getElementById('truth-tree'),
-            isConsistent.truth_tree
-        );
-    }
-    else if (parsedInput.get_kind() == logic_wasm.InputKind.Argument) {
-        var isValid = parsedInput.is_valid();
-
-        document.getElementById('output-tab-container').innerHTML = _computeHtmlOutput({
-            message: `Argument is${isValid.is_valid ? ' ' : ' not '}valid.`,
-            trees: [
-                {
-                    id: 'truth-tree',
+                else if (isTautology.is_tautology) {
+                    isWhat = 'tautology';
                 }
-            ]
-        });
-
-        new TruthTree(
-            document.getElementById('truth-tree'),
-            isValid.truth_tree
-        );
-    }
-    else if (parsedInput.get_kind() == logic_wasm.InputKind.Statement) {
-        var isContradiction = parsedInput.is_contradiction();
-        var isTautology = parsedInput.is_tautology();
-
-        var isWhat = null;
-
-        if (isContradiction.is_contradiction) {
-            isWhat = 'contradiction';
-        }
-        else if (isTautology.is_tautology) {
-            isWhat = 'tautology';
-        }
-        else {
-            isWhat = 'contingency';
-        }
-
-        document.getElementById('output-tab-container').innerHTML = _computeHtmlOutput({
-            message: `Statement is ${isWhat}.`,
-            trees: [
-                {
-                    header: 'Tree for statement',
-                    id: 'truth-tree-contradiction',
-                },
-                {
-                    header: 'Tree for negation of statement',
-                    id: 'truth-tree-tautology',
+                else {
+                    isWhat = 'contingency';
                 }
-            ]
+
+                document.getElementById('output-tab-container').innerHTML = _computeHtmlOutput({
+                    message: `Statement is ${isWhat}.`,
+                    trees: [
+                        {
+                            header: 'Tree for statement',
+                            id: 'truth-tree-contradiction',
+                        },
+                        {
+                            header: 'Tree for negation of statement',
+                            id: 'truth-tree-tautology',
+                        }
+                    ]
+                });
+
+                new TruthTree(
+                    document.getElementById('truth-tree-contradiction'),
+                    isContradiction.truth_tree
+                );
+
+                new TruthTree(
+                    document.getElementById('truth-tree-tautology'),
+                    isTautology.truth_tree
+                );
+            }
+
+            _moveToOutputTab();
         });
-
-        new TruthTree(
-            document.getElementById('truth-tree-contradiction'),
-            isContradiction.truth_tree
-        );
-
-        new TruthTree(
-            document.getElementById('truth-tree-tautology'),
-            isTautology.truth_tree
-        );
-    }
-
-    _moveToOutputTab();
 }
 
 function _computeHtmlParseError(e) {
