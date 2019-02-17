@@ -58,8 +58,17 @@
 /******/ 					"__wbindgen_json_parse": function(p0i32,p1i32) {
 /******/ 						return installedModules["../wasm-layer/pkg/wasm_layer.js"].exports["__wbindgen_json_parse"](p0i32,p1i32);
 /******/ 					},
-/******/ 					"__wbg_error_cc95a3d302735ca3": function(p0i32,p1i32) {
-/******/ 						return installedModules["../wasm-layer/pkg/wasm_layer.js"].exports["__wbg_error_cc95a3d302735ca3"](p0i32,p1i32);
+/******/ 					"__wbg_new_a99726b0abef495b": function() {
+/******/ 						return installedModules["../wasm-layer/pkg/wasm_layer.js"].exports["__wbg_new_a99726b0abef495b"]();
+/******/ 					},
+/******/ 					"__wbg_stack_4931b18709aff089": function(p0i32,p1i32) {
+/******/ 						return installedModules["../wasm-layer/pkg/wasm_layer.js"].exports["__wbg_stack_4931b18709aff089"](p0i32,p1i32);
+/******/ 					},
+/******/ 					"__wbg_error_f7214ae7db04600c": function(p0i32,p1i32) {
+/******/ 						return installedModules["../wasm-layer/pkg/wasm_layer.js"].exports["__wbg_error_f7214ae7db04600c"](p0i32,p1i32);
+/******/ 					},
+/******/ 					"__wbindgen_object_drop_ref": function(p0i32) {
+/******/ 						return installedModules["../wasm-layer/pkg/wasm_layer.js"].exports["__wbindgen_object_drop_ref"](p0i32);
 /******/ 					},
 /******/ 					"__wbindgen_throw": function(p0i32,p1i32) {
 /******/ 						return installedModules["../wasm-layer/pkg/wasm_layer.js"].exports["__wbindgen_throw"](p0i32,p1i32);
@@ -155,7 +164,7 @@
 /******/
 /******/ 		// Fetch + compile chunk loading for webassembly
 /******/
-/******/ 		var wasmModules = {"0":["../wasm-layer/pkg/wasm_layer_bg.wasm"]}[chunkId] || [];
+/******/ 		var wasmModules = {"2":["../wasm-layer/pkg/wasm_layer_bg.wasm"]}[chunkId] || [];
 /******/
 /******/ 		wasmModules.forEach(function(wasmModuleId) {
 /******/ 			var installedWasmModuleData = installedWasmModules[wasmModuleId];
@@ -165,7 +174,7 @@
 /******/ 				promises.push(installedWasmModuleData);
 /******/ 			else {
 /******/ 				var importObject = wasmImportObjects[wasmModuleId]();
-/******/ 				var req = fetch(__webpack_require__.p + "" + {"../wasm-layer/pkg/wasm_layer_bg.wasm":"fa1c053a025475c00cfb"}[wasmModuleId] + ".module.wasm");
+/******/ 				var req = fetch(__webpack_require__.p + "" + {"../wasm-layer/pkg/wasm_layer_bg.wasm":"10278f9bf6e14c5ff5a0"}[wasmModuleId] + ".module.wasm");
 /******/ 				var promise;
 /******/ 				if(importObject instanceof Promise && typeof WebAssembly.compileStreaming === 'function') {
 /******/ 					promise = Promise.all([WebAssembly.compileStreaming(req), importObject]).then(function(items) {
@@ -266,7 +275,7 @@
 /*! no static exports found */
 /***/ (function(module, exports, __webpack_require__) {
 
-eval("// A dependency graph that contains any wasm must all be imported\r\n// asynchronously. This `bootstrap.js` file does the single async import, so\r\n// that no one else needs to worry about it again.\r\nPromise.all(/*! import() */[__webpack_require__.e(1), __webpack_require__.e(0)]).then(__webpack_require__.bind(null, /*! ./index.js */ \"./index.js\"))\r\n  .catch(e => console.error(\"Error importing `index.js`:\", e));\r\n\n\n//# sourceURL=webpack:///./bootstrap.js?");
+eval("Promise.all(/*! import() */[__webpack_require__.e(1), __webpack_require__.e(0)]).then(__webpack_require__.bind(null, /*! ./index.js */ \"./index.js\")).catch(e => console.log(\"Error loading 'index.js': \", e));\n\n//# sourceURL=webpack:///./bootstrap.js?");
 
 /***/ })
 
