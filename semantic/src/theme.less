@@ -12,9 +12,6 @@
    Site Variables
 ---------------------*/
 
-/* Default site.variables */
-@import "@{themesFolder}/default/globals/site.variables";
-
 /* Packaged site.variables */
 @import "@{themesFolder}/@{site}/globals/site.variables";
 
@@ -29,9 +26,6 @@
  Component Variables
 ---------------------*/
 
-/* Default */
-@import "@{themesFolder}/default/@{type}s/@{element}.variables";
-
 /* Packaged Theme */
 @import (optional) "@{themesFolder}/@{theme}/@{type}s/@{element}.variables";
 
@@ -42,9 +36,6 @@
 /*-------------------------
     Central Color Map
 -------------------------*/
-
-/* Default */
-@import "@{themesFolder}/default/globals/colors.less";
 
 /* Site Theme */
 @import (optional) "@{themesFolder}/@{site}/globals/colors.less";
