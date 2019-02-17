@@ -237,19 +237,20 @@ export default class TruthTree {
         }
       });
 
-      stack.push(...branch.children.map(x => [x, currLevel]));
+      stack.push(...branch.children.map(x => [x, currLevel + 2]));
+      // + 2 for spacing between branches (one for the hidden parent, another for the hidden parent of child branches)
     }
   }
 
   _compute(data) {
     var mainTrunk = this._parseBranchData(new Map(), data.main_trunk, null);
-    this._computeLevels(mainTrunk);
 
     var dataSet = {
       nodes: [],
       edges: [],
     };
 
+    this._computeLevels(mainTrunk);
     this._populateDataSet(dataSet, mainTrunk);
     this._computeLineNumbers(dataSet);
 
@@ -352,11 +353,13 @@ export default class TruthTree {
       // edges to the very center of the nodes
       // We also need to offset the children branches' nodes' levels by 2
       // (one level for the hidden parent node, one level for all the hidden children nodes)
+      // Actually I had to move the offseting to _computeLevels because
+      // doing it here would require recomputing levels in some cases
       var hiddenParentId = this._insertHiddenNodeOnDataSet(dataSet, last.treeLevel + 1);
       this._insertHiddenEdgeOnDataSet(dataSet, last.treeId, hiddenParentId);
 
       branch.children.forEach(child => {
-        this._offsetLevels(child, child.nodes[0].treeLevel, 2);
+        // this._offsetLevels(child, child.nodes[0].treeLevel, 2);
 
         // Children may be lower in the tree to match the lines for each derivation
         // hence the hidden parent of the child should be only one level above the child
