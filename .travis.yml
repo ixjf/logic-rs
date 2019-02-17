@@ -9,6 +9,8 @@ matrix:
   allow_failures:
     - rust: nightly
   fast_finish: true
+branches:
+  - master
 
 addons:
   apt:
