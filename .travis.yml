@@ -10,8 +10,9 @@ matrix:
     - rust: nightly
   fast_finish: true
 branches:
-  only:
-    - master
+  except:
+    - www
+    - wasm-layer
 
 addons:
   apt:
