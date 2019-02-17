@@ -438,10 +438,12 @@ export default class TruthTree {
       // Find first for some level 'level' (left gutter is the same for all in the
       // same level)
       var node = dataSet.nodes.get({
-        filter: x => { return x.level == level }
-      })[0];
+        filter: x => {
+          return x.level === level;
+        }
+      }).find(x => x.nodeRef != null);
 
-      if (node.nodeRef != null) {
+      if (node) {
         // All nodes on same level are on same Y
         var nodeOriginY = this._calculateNodeOriginY(node.id);
 
@@ -584,7 +586,10 @@ export default class TruthTree {
         this.container.style.width = treeWidth.toString() + 'px';
         this.container.style.height = treeHeight.toString() + 'px';
 
-        this.network.redraw();
+        this.network.redraw(); // This seems to be rerendering
+        // but it's actually needed, otherwise the network will simply
+        // disappear for some reason
+        // FIXME?
         this.network.fit(); // This doesn't actually take into account
         // any post-rendering
       }
