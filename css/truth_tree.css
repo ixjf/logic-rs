@@ -5,9 +5,9 @@
     --statement-text-size: 16;
     --statement-text-face: arial;
 
-    --branch-close-icon-face: Ionicons;
-    --branch-close-icon-code: f12a;
-    --branch-close-icon-size: 20;
+    --branch-close-icon-face: Icons;
+    --branch-close-icon-code: ea0f;
+    --branch-close-icon-size: 16;
     --branch-close-icon-colour: black;
 
     --edge-colour: black;
@@ -24,7 +24,16 @@
     --node-spacing: 75;
 
     --checkmark-icon-size: 16;
-    --checkmark-icon-face: Ionicons;
-    --checkmark-icon-code: f122;
+    --checkmark-icon-face: Icons;
+    --checkmark-icon-code: ea10;
     --checkmark-icon-colour: black;
+}
+
+/* Icons from IcoMoon, encoded to base64 with Font Squirrel */
+@font-face {
+    font-family: 'Icons';
+    src: url(data:application/font-woff;charset=utf-8;base64,d09GRgABAAAAAARwAA0AAAAABuQAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAABGRlRNAAAEVAAAABwAAAAchwpoHUdERUYAAAQ4AAAAHAAAAB4AJwAOT1MvMgAAAZgAAABAAAAAYA7rBmtjbWFwAAAB9AAAAFkAAAFm6lkuBmdhc3AAAAQwAAAACAAAAAgAAAAQZ2x5ZgAAAmQAAACxAAABVPdJhCtoZWFkAAABMAAAADAAAAA2FDtm4WhoZWEAAAFgAAAAHgAAACQHwgO0aG10eAAAAdgAAAAbAAAAHg1J//9sb2NhAAACUAAAABIAAAASAOIAtm1heHAAAAGAAAAAGAAAACAACgBWbmFtZQAAAxgAAADcAAABm/pYTdhwb3N0AAAD9AAAADoAAABZMJ01aHjaY2BkAAOxmz4f4vltvjJws4D5N/r6lSH0ZMf////vZ2FkPgjkcjAwgUQBVP4MvHjaY2BkYGA+8H8NAwMLw///QJKRASiCAtgBePkEfwAAeNpjYGRgYOBgCGEA0QwMTAxoAAAJhABheNpjYGY2YJzAwMrAwjST6QwDA0M/hGZ8zWDMyMmAChgF0AQYHBgYXwkwH/h/gIGB+QBDCEgNkqwCAyMAKtYKYnjaY2GAAMZQCM0EYn9hYGBh+P+fgQEAF3ADVAB42mNgYGBmgGAZBkYGEEgA8hjBfBYGFyDNw8DBwARkMzIoqP55JfD/7///YHUgHj+E9//JLU7R72B9PAwIwAgyl5ENiJmhAkxAgokBFQDtYmEY3gAAXlsRawAAAAAAAAAACAAIABAAGAAgAJYAqgAAeNqVjzEOglAMhvu3+F7eggkDbMgibBgXni7IHbyAR2F19gLexDhyC2/h9rCakBAn7dC03/+3TQk0BRPtmX7vRXshjON4iyB3OhKtd9g6aGrhm3KDGjaGnWCNqjRLxMhyZBNU3aQr5PA6M0HV0+aAFlUNeYYBnvWE2ItNnBgOQxjYiEsUiCBieAVzB7yOzBznb8D/L6XP70VE0tGCyKGyDnIKxeOKnnvp3lXQ6gW0uy/NAAAAeNp1zrFqwlAYxfF/NFq0IJ1K6XRHp6DgA3QqdXDpIB0b4yUE9F6IEXTvI3TsM/RhfCJPwrcmcMPvOzfnI8CMfxLaJ+GBJ/NAnpuH8ps5lb/MIx65mMfKf81TXrmplaQTJbNuQ+uB/GIeygtzKn+YRzzzbR4r/zFPWfFHRUHkqBMJUBXxGKPwiafkzIGcWqMvz4dc6Pu+L99qT81J923uWJLpL9n6+lTF4JbZor/73s2NWqW2hG5TrtmzV7bjqve6626sm6kUQ+NKH3ydN37vdle3LuJG+zLu5ds+Q3jaY2BiwA84GBgYmRiYGJkZmBlZGFkZ2djScyoLMgzZS/MyDQwMwLSRqZsziHZ1NHCD0IYGAO4CC2QAAAABAAH//wAPeNpjYGRgYOABYjEgZmJgBEJ2IGYB8xgAA+sANgAAAAEAAAAA1e1FuAAAAADYjo8jAAAAANiOk0E=) format('woff');
+    font-weight: normal;
+    font-style: normal;
+
 }
