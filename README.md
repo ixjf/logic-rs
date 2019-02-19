@@ -87,6 +87,9 @@ it is certain that the initial set of statements is satisfiable.
 # Source code
 
 **master** branch - source code for Rust crate logic-rs
+
 **www** branch - source code for website
+
 **gh-pages** branch - production code for website
+
 **wasm-layer** branch - wasm layer for integrating the Rust crate into the website
