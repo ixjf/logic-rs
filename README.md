@@ -4,7 +4,7 @@
 
 A parser of relational predicate logic and truth tree solver.
 
-logic_rs is heavily influenced by the book _Meaning and Argument:
+logic-rs is heavily influenced by the book _Meaning and Argument:
 An Introduction to Logic Through Language_, by Ernest Lepore and Sam Cumming, trying
 to follow as closely as possible its grammar and rules.
 
@@ -15,7 +15,7 @@ The library powers its website, which you can find [here](https://ixjf.github.io
 serving only that purpose, but it is not tied to it at all, and can be used
 completely independently.
 
-**Note: logic_rs _currently_ doesn't support identity statements.**
+**Note: logic-rs _currently_ doesn't support identity statements.**
 
 # Usage
 Validating some formula is as simple as:
