@@ -84,7 +84,7 @@ It is guaranteed, however, _unless there is some bug_, that the algorithm will a
 _all_ unsatisfiable set of statements. So, if the algorithm _does_ get into an infinite loop, then
 it is certain that the initial set of statements is satisfiable.
 
-# Source code
+# Branches
 
 **master** branch - source code for Rust crate logic-rs
 
