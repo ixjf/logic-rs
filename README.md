@@ -2,7 +2,7 @@
 [![Build Status](https://travis-ci.org/ixjf/logic-rs.svg?branch=master)](https://travis-ci.org/ixjf/logic-rs)
 [![codecov](https://codecov.io/gh/ixjf/logic-rs/branch/master/graph/badge.svg)](https://codecov.io/gh/ixjf/logic-rs)
 
-This is WIP but not currently being maintained. The issue tracker contains the roadmap with all known bugs/changes/features yet to be added.
+**This is WIP but not currently being maintained. The issue tracker contains the roadmap with all known bugs/changes/features yet to be added.**
 
 A parser of relational predicate logic and truth tree solver.
 
